@@ -273,14 +273,7 @@ function spawn_parts( obj, number, who )
   if not obj then return end
   if not number then number = 0 end
   local section = obj:section()
-  if who:id() == db.actor:id() then
-    spawn_parts_for_actor( obj, number )
-  elseif
-    ( IsStalker( who ) or IsMonster( who ) )
-    and not ogse.is_quest_npc( who )
-  then
-    transfer_everything( obj, who )
-  end
+  transfer_everything( obj, db.actor )
 end
 
 

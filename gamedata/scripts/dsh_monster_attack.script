@@ -304,7 +304,7 @@ end
 
 
 function bloodsucker_attack_phantom( obj )
-  local attack_dist = 15
+  local attack_dist = 2.5
   local dist = obj:position():distance_to( db.actor:position() )
   ogse_signals.get_mgr():reschedule(
     ( dist < obj:range() and dist > attack_dist ) and 1000 or 5000
@@ -406,7 +406,7 @@ function boar_body_attack( obj )
         belt_rs  = 0
       end
     end
-    db.actor.radiation = 0.0005 + 0.0002 * level.get_game_difficulty()
+    db.actor.radiation = 0.00005 + 0.00002 * level.get_game_difficulty()
       + 0.008 * dsh.get_this_level_difficulty() + belt_rs
     binder.attack_pt   = { game.get_game_time():get() }
     if dsh_hud_fx.has_detector() then
@@ -424,7 +424,7 @@ end
 
 
 function burer_attack( obj )
-  local attack_dist = 25
+  local attack_dist = 10
   local dist = obj:position():distance_to( db.actor:position() )
   ogse_signals.get_mgr():reschedule(
     ( dist < attack_dist and 100 )
@@ -494,7 +494,7 @@ end
 
 
 function chimera_attack( obj )
-  local attack_dist = 15
+  local attack_dist = 2.5
   local dist = obj:position():distance_to( db.actor:position() )
   ogse_signals.get_mgr():reschedule(
     ( dist < attack_dist and 250 )
@@ -679,7 +679,7 @@ end
 local pseudodog_cam_t
 
 function pseudodog_attack( obj )
-  local attack_dist = 20
+  local attack_dist = 10
   local dist = obj:position():distance_to( db.actor:position() )
   ogse_signals.get_mgr():reschedule(
     ( dist < attack_dist and 500 )
@@ -814,7 +814,7 @@ end
 
 
 function zombie_attack( obj )
-  local attack_dist = 35
+  local attack_dist = 2.5
   local dist = obj:position():distance_to( db.actor:position() )
   ogse_signals.get_mgr():reschedule(
     dist < attack_dist and 1000 or 5000
@@ -847,7 +847,7 @@ end
 
 -- Атака насекомых при приближении к чумному зомби
 function zombie_plague_attack( obj )
-  local attack_dist = 10
+  local attack_dist = 2.5
   local dist = obj:position():distance_to( db.actor:position() )
   ogse_signals.get_mgr():reschedule(
     ( dist < attack_dist and 100 )
@@ -898,7 +898,7 @@ end
 local komar_sound = xr_sound.get_safe_sound_object( [[anomaly\komar]] )
 
 function zombie_plague_komar_attack( obj )
-  local attack_dist = 12
+  local attack_dist = 2.5
   local dist = obj:position():distance_to( db.actor:position() )
   ogse_signals.get_mgr():reschedule(
     ( dist < attack_dist and 250 )

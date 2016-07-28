@@ -36,11 +36,7 @@ function on_spawn()
   local have_helmet = ogse.load_var(
     script_name() .. ".helmet_on_off.status", true
   )
-  if have_helmet then
-    suithud, suithud_enable = true,  false
-  else
-    suithud, suithud_enable = false, false
-  end
+  suithud, suithud_enable = true,  false
 end
 
 
@@ -488,18 +484,5 @@ end
 
 
 function on_hit( obj, amount, dir, who, bone_index )
-  if amount > 0 and bone_index and bone_index > 0 and db.actor:alive() then
-    if bone_index >= 11 and bone_index < 18 then -- попадание в голову
-      local outfit = db.actor:get_current_outfit()
-      if
-        outfit
-        and get_bool( outfit:section(), "dynamic_hud_enable", false )
-        and not is_helmet_on
-      then
-        dsh.timeout( 250, function()
-          db.actor:kill( who )
-        end )
-      end
-    end
-  end
+  
 end
