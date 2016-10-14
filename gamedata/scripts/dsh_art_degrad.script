@@ -294,7 +294,7 @@ function process_arts()
     end
   end
   for _, af in ipairs( empty ) do
-    degrade_artefact( af )
+    --degrade_artefact( af )
   end
   for hit_type, hit_power in pairs( got_hits ) do
     got_hits[ hit_type ] = 0

@@ -17,6 +17,7 @@ end
 
 local pt
 function update()
+	return
   ogse_signals.get_mgr():reschedule( 500 )
   local pos = db.actor:position()
   if pos.y < -0.01 then
