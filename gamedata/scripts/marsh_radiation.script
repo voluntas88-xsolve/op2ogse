@@ -8,12 +8,16 @@ end
 
 
 function on_spawn()
-  return
+  if level.name() ~= "marsh" or has_alife_info( "no_marsh_radiation" ) then
+    return
+  end
+  ogse_signals.get_mgr():subscribe({ signal = "on_update", fun = this.update })
 end
 
 
 local pt
 function update()
+  ogse_signals.get_mgr():reschedule( 500 )
   local pos = db.actor:position()
   if pos.y < -0.01 then
     if not has_alife_info( "marsh_radiation" ) then
@@ -66,5 +70,4 @@ function update()
     db.actor:disable_info_portion( "marsh_radiation" )
     pt = nil
   end
-  dsh.timeout( 500, this.update )
 end

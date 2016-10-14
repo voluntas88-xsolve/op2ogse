@@ -20,13 +20,13 @@ local min_cond_parts = 0.1			-- минимальное состояние ствола на запчасти (ниже н
 local cond_ok = 0.99				-- минимальное состояние исправного предмета
 local cond_double = 0.4				-- минимальное состояние предмета, ниже которого требуется двойной комплект предметов, стволов и денег
 local rep_percent = 0.1				-- на сколько чинится предмет одним ремкомплектом
-local money_koef = 0.1				-- множитель денег на ремонт
+local money_koef = 0.5				-- множитель денег на ремонт
 local repair_wo_wpn_koef = 10 -- коэффициент стоимости ремонта без зап. частей
 local ammo, item, cond, count, have, slot, parts, pay = "", 0, 0, 0, 0, 0, {}, 0
 
 -- предметы, нужные для ремонта ствола и брони
-local parts_wpn = {}
-local parts_armor = {}
+local parts_wpn = {"art_acumm"}
+local parts_armor = {"art_acumm"}
 
 --- Можем ли ремонтировать ремкомплектом
 function repair_can_be_done(obj)
@@ -169,19 +169,19 @@ function talk_parts(slt)
 
 	if slot == 6 then
 		if cond > cond_double then
-			text = "Для ремонта брони мне нужно "..tostring(parts_money()).." рублей. Будем ремонтироваться?"
+			text = "Для ремонта брони мне нужно "..parts_list().." и "..tostring(parts_money()).." рублей. Будем ремонтироваться?"
 		else
 			count = 2
-			text = "Броня сильно потрепана, поэтому для ремонта мне нужно "..tostring(parts_money()).." рублей. Будем ремонтироваться?"
+			text = "Броня сильно потрепана, поэтому для ремонта мне нужно два артефакта "..parts_list().." и "..tostring(parts_money()).." рублей. Будем ремонтироваться?"
 		end
 	else
 		if cond > cond_double then
 			local parts_money = parts_money()
-			text = "Для ремонта мне нужен любой ствол такого же калибра на запчасти, "..parts_list().." и "..tostring(parts_money).." рублей. Будем ремонтироваться?"
+			text = "Для ремонта мне нужен любой ствол такого же калибра на запчасти, "..parts_list().." и "..tostring(parts_money).." рублей. Или " .. parts_list() .. " и " .. tostring( parts_money * repair_wo_wpn_koef ) .. " рублей, а остальное я достану сам. Будем ремонтироваться?"
 		else
 			count = 2
 			local parts_money = parts_money()
-			text = "Этот ствол изрядно потрепан. Поэтому мне нужно два любых ствола такого же калибра на запчасти и "..tostring(parts_money).." рублей.  Будем ремонтироваться?"
+			text = "Этот ствол изрядно потрепан. Поэтому мне нужно два любых ствола такого же калибра на запчасти, два артефакта "..parts_list().." и "..tostring(parts_money).." рублей. Или два артефакта " .. parts_list() .. " и "  .. tostring( parts_money * repair_wo_wpn_koef ) .. " рублей, а остальное я достану сам. Будем ремонтироваться?"
 		end
 	end
 
