@@ -1,0 +1,304 @@
+-- -*- mode: lua; coding: windows-1251-dos -*-
+
+-- Ключем является группировка персонажа. Значением является таблица,
+-- содержашая имена секций предметов.
+local item_by_community = {}
+local community_list    = {
+  "def_box",
+  "small_box_generic",
+  "small_box_ussr",
+  "small_box_nato",
+  "small_box_army",
+  "small_box_science",
+  "big_box_generic",
+  "big_box_dungeons",
+  "big_box_arsenal",
+}
+
+--' Множители и минимаксы для выпадения вещей в зависимости от уровня
+local mul_by_level   = {}
+local count_by_level = {}
+
+--' Предметы, относящиеся к патронам. Их надо спаунить другим методом.
+local ammo_sections = {}
+
+local death_ini  = ini_file( "misc\\ph_box_generic.ltx" )
+local configured = false
+
+-- ящики с таким визуалом через некоторое время снова появятся
+local recreatable = [[physics\box\box_wood_01]]
+
+
+function configure()
+  --' Множители и минимаксы для выпадения вещей в зависимости от уровня
+  local level_name = level.name()
+  if not death_ini:section_exist( level_name ) then
+    level_name = "default"
+  end
+  local n = death_ini:line_count( level_name )
+  for i = 0, n - 1 do
+    local result, id, value = death_ini:r_line( level_name, i, "","" )
+    mul_by_level[ id ] = tonumber( value )
+  end
+
+  local item_count_section = "item_count_" .. level.get_game_difficulty()
+  local n = death_ini:line_count( item_count_section )
+  for i = 0, n - 1 do
+    local result, id, value = death_ini:r_line( item_count_section,i,"","" )
+    --' Нужно распарсить value в два значения
+    local t = parse_nums( value )
+    if t[ 1 ] == nil then
+      abort(
+        "Error on [death_ini] declaration. Section [%s], line [%s]",
+        item_count_section, tostring( id )
+      )
+    end
+    local min = t[ 1 ]
+    local max = t[ 2 ]
+    if max == nil then max = min end
+    if mul_by_level[ id ] == nil then mul_by_level[ id ] = 0 end
+    min = tonumber( min ) * mul_by_level[ id ]
+    max = tonumber( max ) * mul_by_level[ id ]
+    count_by_level[ id ] = { min = min, max = max }
+  end
+
+  for _, v in ipairs( community_list ) do
+    --' Необходимо заполнить таблицу
+    item_by_community[ v ] = {}
+    if death_ini:section_exist( v ) then
+      local n = death_ini:line_count( v )
+      for i = 0, n - 1 do
+        local result, id, value = death_ini:r_line( v, i, "", "" )
+        local rnd = tonumber( value )
+        if rnd > 0 and mul_by_level[ id ] > 0 then
+          ASSERT(
+            count_by_level[ id ], "count_by_level not defined for %s", id
+          )
+          item_by_community[ v ][ id ] = rnd
+        end
+      end
+    end
+  end
+
+  --' Предметы, относящиеся к патронам. Их надо спаунить другим методом.
+  ammo_sections = {}
+  local n = death_ini:line_count( "ammo_sections" )
+  for i = 0, n - 1 do
+    local result, id, value = death_ini:r_line( "ammo_sections", i, "", "" )
+    ammo_sections[ id ] = true
+  end
+end
+
+
+class "ph_item_box"
+function ph_item_box:__init( obj )
+  if not configured then
+    configure()
+    configured = true
+  end
+  self.obj = obj
+
+  local ini  = self.obj:spawn_ini()
+  self.name  = get_string( "drop_box", "orig_name", self.obj:name(), ini )
+  self.items = self:get_items( ini )
+
+  local community   = get_string( "drop_box", "community", "def_box", ini )
+  self.random_items = item_by_community[ community ]
+  if not self.random_items then
+    log2(
+      "xr_box: [%s]: wrong community -- %s setting default def_box ",
+      self.obj:name(), community
+    )
+    self.random_items = item_by_community[ "def_box" ]
+  end
+
+  self.xyzlg = get_string( "drop_box", "orig_xyzlg", nil, ini )
+  if self.xyzlg then
+    self.xyzlg = parse_nums( self.xyzlg )
+  else
+    self:configure_xyzlg()
+  end
+end
+
+
+function ph_item_box:get_items( ini )
+  local dsh_sect = "dsh." .. script_name() .. "." .. self.obj:name()
+  if
+    sys_ini:section_exist( dsh_sect )
+    and sys_ini:line_exist( dsh_sect, "items" )
+  then
+    return r_items( sys_ini, dsh_sect, "items" )
+  end
+  return r_items( ini, "drop_box", "items" )
+end
+
+
+function ph_item_box:configure_xyzlg()
+  local sobj = alife():object( self.obj:id() )
+  ASSERT( sobj, "%s not found in alife()", self.obj:name() )
+  local pk = get_netpk( sobj, 1 )
+  ASSERT( pk:isOk(), "can't read netpacket of %s", sobj:name() )
+  local data = pk:get()
+  local cd   = data.custom_data:getTable()
+  local drop_box = cd[ "drop_box" ]
+  ASSERT( drop_box, "[drop_box] not found in %s", sobj:name() )
+  local pos = self.obj:position()
+  self.xyzlg = {
+    pos.x, pos.y, pos.z, self.obj:level_vertex_id(), self.obj:game_vertex_id()
+  }
+  drop_box.orig_xyzlg = table.concat( self.xyzlg, "," )
+  data.custom_data:set( cd )
+  pk:set( data )
+end
+
+
+function ph_item_box:spawn_items()
+  if self.obj:get_visual_name() == recreatable then
+    self:recreate_box()
+  end
+  if self.items then
+    for _, v in ipairs( self.items ) do
+      create_obligatory_items( self.obj, v.section, v.count )
+    end
+    return
+  end
+  -- Доспавниваем необходимое количество итемов:
+  -- Необходимо составить список объектов которые могут быть
+  -- заспавнены для персонажа
+  for k, rnd in pairs( self.random_items ) do
+    --' По каждому объекту необходимо получить количество
+    local number = math.ceil(
+      math.random( count_by_level[ k ].min, count_by_level[ k ].max )
+    )
+    if number > 0 and rnd > 0 then
+      --' Необходимо заспавнить нужное количество.
+      create_items( self.obj, k, number, rnd )
+    end
+  end
+end
+
+
+function ph_item_box:recreate_box()
+  local items = {}
+  for k, rnd in pairs( item_by_community[ "def_box" ] ) do
+    local n = math.ceil(
+      math.random( count_by_level[ k ].min, count_by_level[ k ].max )
+    )
+    if n > 0 and rnd > 0 and math.random() <= rnd then
+      table.insert( items, k )
+    end
+  end
+  items     = table.concat( items, "," )
+  local pos = self.obj:position()
+  dsh.start_gtimerDHMS(
+    script_name() .. ".recreate_box." .. self.name,
+    0, math.random( 20, 24 * 7 ), 0, 0,
+    script_name() .. ".recreate_box_on_timer",
+    self.name, recreatable, items, unpack( self.xyzlg )
+  )
+end
+
+
+function recreate_box_on_timer( name, vis, items, x, y, z, lvid, gvid )
+  local xyz = { tonumber( x ), tonumber( y ), tonumber( z ) }
+  local lg  = { tonumber( lvid ), tonumber( gvid ) }
+  local sobj = alife():create(
+    "physic_destroyable_object", vector():set( unpack( xyz ) ), unpack( lg )
+  )
+  local pk = get_netpk( sobj, 1 )
+  ASSERT( pk:isOk(), "can't read netpacket of %s", sobj:name() )
+  local data = pk:get()
+  data.visual_name = vis
+  data.custom_data:setString(
+    "[drop_box]\n"
+    .. "orig_name  = " .. name .. "\n"
+    .. "orig_xyzlg = " .. table.concat( xyz, "," ) .. ","
+      .. table.concat( lg, "," ) .. "\n"
+    .. "community  = def_box\n"
+    .. "items      = " .. items .. "\n"
+  )
+  data.physic_type = 3
+  data.mass        = 20
+  pk:set( data )
+end
+
+
+--' Функция спавнит необходимое число предметов
+function create_items( obj, section, number, rnd )
+  if ammo_sections[ section ] == true then
+    if math.random() <= rnd then
+      local position = vector():set( 0, 0, 0 )
+      position.x = obj:position().x + math.random( -30, 30 ) / 100
+      position.z = obj:position().z + math.random( -30, 30 ) / 100
+      position.y = obj:position().y + math.random(  30, 50 ) / 100
+      se_respawn.create_ammo(
+        section, position, obj:level_vertex_id(), obj:game_vertex_id(), 65535,
+        number
+      )
+    end
+  else
+    for i = 1, number do
+      --' Проверяем вероятность появить каждый объект в отдельности
+      if math.random() <= rnd then
+        local position = vector():set( 0, 0, 0 )
+        position.x = obj:position().x + math.random( -30, 30 ) / 100
+        position.z = obj:position().z + math.random( -30, 30 ) / 100
+        position.y = obj:position().y + math.random(  30, 50 ) / 100
+        alife():create(
+          section, position, obj:level_vertex_id(), obj:game_vertex_id()
+        )
+      end
+    end
+  end
+end
+
+
+function r_items( spawn_ini, section, line )
+  if spawn_ini:line_exist( section, line ) then
+    -- если default-ов больше, чем значений в ini, то забить
+    -- недостающие последним значением из ini
+    local s         = get_string( section, line, nil, spawn_ini )
+    local t         = parse_names( s or "" )
+    local n         = table.getn( t )
+    local ret_table = {}
+    local k         = 1
+    while k <= n do
+      local item = {}
+      item.section = t[ k ]
+      -- Проверяем что это не последняя запись
+      if t[ k + 1 ] ~= nil then
+        local p = tonumber( t[ k + 1 ] )
+        -- проверяем что вторым числом задана вероятность, а не другая
+        -- секция спавну
+        if p then
+          -- забиваем число
+          item.count = p
+          k = k + 2
+        else
+          -- забиваем дефолт 1
+          item.count = 1
+          k = k + 1
+        end
+      else
+        item.count = 1
+        k = k + 1
+      end
+      table.insert( ret_table, item )
+    end
+    return ret_table
+  end
+  return nil
+end
+
+
+function create_obligatory_items( obj, item, count )
+  for i = 1, count do
+    local position = vector():set( 0, 0, 0 )
+    position.x = obj:position().x + math.random( -30, 30 ) / 100
+    position.z = obj:position().z + math.random( -30, 30 ) / 100
+    position.y = obj:position().y + math.random(  30, 50 ) / 100
+    alife():create(
+      item, position, obj:level_vertex_id(), obj:game_vertex_id()
+    )
+  end
+end

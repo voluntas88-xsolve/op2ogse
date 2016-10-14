@@ -1,0 +1,53 @@
+-- -*- mode: lua; coding: windows-1251-dos -*-
+
+function attach( sm )
+  sm:subscribe({ signal = "on_treasure_empty", fun = this.on_treasure_empty  })
+end
+
+
+function clear_rnd_treasure()
+  local sid = ogse.load_var_safe( script_name() .. ".sid"   )
+  if sid then
+    local tr_sobj  = alife():story_object( sid )
+    if tr_sobj and treasure_manager.is_active( tr_sobj ) then
+      local item_ids = ogse.load_var_safe( script_name() .. ".items" )
+      for _, id in ipairs( item_ids ) do
+        local item_sobj = alife():object( id )
+        if item_sobj and item_sobj.parent_id == tr_sobj.id then
+          alife():release( item_sobj )
+        end
+      end
+      treasure_manager.get_treasure_manager():treasure_empty( nil, sid )
+    end
+  end
+  spawn_rnd_treasure()
+end
+
+
+function spawn_rnd_treasure()
+  local tn = script_name() .. ".clear_rnd_treasure"
+  if ogse_st_mgr.timer_exists( tn ) then return end
+  local sobj, items = treasure_manager.get_treasure_manager()
+    :give_rnd_treasure_on_level( level.name() )
+  if sobj and table.getn( items ) then
+    local item_ids = {}
+    for _, v in ipairs( items ) do
+      for _, id in ipairs( v.id ) do
+        table.insert( item_ids, id )
+      end
+    end
+    ogse.save_var( script_name() .. ".sid",   sobj.m_story_id, "u32"   )
+    ogse.save_var( script_name() .. ".items", item_ids, "array", "u16" )
+    dsh.start_gtimerDHMS( tn, 0, math.random( 20, 24 * 7 ), 0, 0, tn )
+  end
+end
+
+
+function on_treasure_empty( box, box_story_id )
+  local sid = ogse.load_var_safe( script_name() .. ".sid" )
+  if sid and sid == box_story_id then
+    for _, k in ipairs({ ".sid", ".items" }) do
+      ogse.delete_var( script_name() .. k )
+    end
+  end
+end

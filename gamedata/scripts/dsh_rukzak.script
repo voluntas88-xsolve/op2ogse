@@ -180,7 +180,11 @@ end
 function get_item_info( obj )
   local sect = obj:section()
   local info
-  if string.find( sect, "arc_art_box_" ) or dsh.is_artefact( sect ) then
+  if
+    string.find( sect, "arc_art_box_" )
+    or dsh.is_artefact( sect )
+    or obj:is_outfit()
+  then
     local sobj = alife():object( obj:id() )
     local data = m_net_utils.get_item_data( sobj )
     info = data.custom or ""
@@ -467,9 +471,7 @@ end
 function on_inv_box_found( id, who )
   local items   = load_rukzak( id )
   local changed = false
-  local lname   = alife():level_name(
-    game_graph():vertex( who.m_game_vertex_id ):level_id()
-  )
+  local lname   = object_level_name( who )
   for _, item in ipairs( items ) do
     if is_item_valuable( item ) and math.random() < 0.5 then
       local count = item.count
@@ -1265,7 +1267,6 @@ end
 function ui_rukzak:on_quit()
   if self.changed then
     save_rukzak( self.owner_id, self.items_other )
-    inventory.forced_inventory_update( false )
   end
   if self.weight_timer then self.weight_timer:stop() end
   self:GetHolder():start_stop_menu( self, true )
@@ -1329,12 +1330,11 @@ end
 function ui_rukzak:show_cur_weight()
   local inv_weight = db.actor:get_inventory_weight()
   local max_weight = db.actor:get_actor_max_weight()
-  local outfit     = db.actor:item_in_slot( 6 )
+  local outfit     = db.actor:get_current_outfit()
   if outfit then
-    local addl_weight = get_float(
+    max_weight = max_weight + get_float(
       outfit:section(), "additional_inventory_weight2", 0
     )
-    max_weight = max_weight + addl_weight
   end
   if inv_weight > max_weight then
     self.label_weight:SetTextColor( 255, 255,  50,  0 )

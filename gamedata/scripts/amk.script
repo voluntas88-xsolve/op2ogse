@@ -5,7 +5,6 @@
 function attach( sm )
   sm:subscribe({ signal = "on_npc_death",  fun = this.on_npc_death    })
   sm:subscribe({ signal = "on_npc_spawn",  fun = this.npc_spawn_event })
-  sm:subscribe({ signal = "on_update",     fun = this.on_actor_upade  })
 end
 
 
@@ -21,7 +20,6 @@ function npc_spawn_event( obj, binder )
     local s = {
       [ "signal" ] = "on_npc_update." .. obj:id(),
       [ "fun"    ] = this.enemy_see_actor,
-      [ "queued" ] = true,
     }
     table.insert( subscribed, s )
     ogse_signals.get_mgr():subscribe( s )
@@ -173,157 +171,132 @@ function remove_spot_from_map(obj_id,type)
   end
 end
 
---старт таймера в реальном времени
---function start_timer(name,delay,action)
-function start_timer(name, delay, parameters)
 
-  if not delay then
-    return false
-  end
-  
-	if not parameters then
-		parameters = ""
-	end
-  
-	local timers = load_table("timers")
-	--dump_table(timers)
-	
-	table.insert(timers, {name, math_floor(game_milliseconds() + delay * 1000 * sys_ini:r_float("alife","time_factor")), parameters})
-
-	-- сортируем для оптимизации дальнейшего поиска по таймерам
-	-- таймеры с меньшим временем будут в конце таблицы
-	table_sort(timers, timersSort)
-	
-	save_table("timers", timers)
-	--dump_table(timers)
-	
---[[  if not delay then
-    return false
-  end
-  
-  if not action then
-    action = ""
-  end
-
-    local time = game.time() --time in seconds since 1970
-  local a=1
-  while db.storage[db.actor:id()].pstor["xt"..a] do
-    a=a+1
-    if a>100 then 
-      return false 
+function start_timer( name, delay, params )
+  if not delay then return false end
+  if not params then params = "" end
+  local tn = script_name() .. "." .. name
+  if ogse_st_mgr.timer_exists( tn ) then
+    local found = false
+    for i = 0, 65535 do
+      local id = tn .. "." .. tostring( i )
+      if not ogse_st_mgr.timer_exists( id ) then
+        log2(
+          "[%s.start_timer]: found free id %s for %s",
+          script_name(), id, tn
+        )
+        found = true
+        tn    = id
+        break
+      end
     end
+    ASSERT( found, "can't find free id for timer %s", tn )
   end
-  save_variable("xt"..a, name)
-  save_variable("xd"..a, time+delay*1000*sys_ini:r_float("alife","time_factor"))
-  save_variable("xp"..a, action)]]
-
+  ogse_st_mgr.start_timer(
+    tn, delay, script_name() .. ".on_ogse_amk_timer",
+    pack_array_to_string({ name, params })
+  )
   return true
 end
+
+
+function g_start_timer( name, d, h, m, params )
+  if not ( d and h and m ) then return false end
+  if not params then params = "" end
+  local tn = script_name() .. "." .. name
+  if ogse_st_mgr.timer_exists( tn ) then
+    local found = false
+    for i = 0, 65535 do
+      local id = tn .. "." .. tostring( i )
+      if not ogse_st_mgr.timer_exists( id ) then
+        log2(
+          "[%s.g_start_timer]: found free id %s for %s",
+          script_name(), id, tn
+        )
+        found = true
+        tn    = id
+        break
+      end
+    end
+    ASSERT( found, "can't find free id for timer %s", tn )
+  end
+  ogse_st_mgr.delayed_fun_start( tn )
+    :set_gdelayDHMS( d, h, m, 0 )
+    :init(
+      script_name() .. ".on_ogse_amk_timer",
+      pack_array_to_string({ name, params })
+    )
+    :start()
+  return true
+end
+
+
+function on_ogse_amk_timer( s )
+  local t = unpack_array_from_string( s )
+  local name, params = unpack( t )
+  if type( params ) == "table" then
+    params = pack_array_to_string( params )
+  end
+  __do_timer_action( name, params )
+end
+
+
+function start_timer_no_save()
+  local tn = script_name() .. ".no_save"
+  if ogse_st_mgr.timer_exists( tn ) then
+    return false
+  end
+  ogse_st_mgr.start_timer( tn, 5, script_name() .. ".on_no_save_timer" )
+  dsh.exec_on_update(
+    function()
+      db.actor:binded_object():show_hud_save_warning(
+        "Нельзя сохраняться, пока есть это предупреждение!!!",
+        6000, true, { 255, 255, 255, 255 }
+      )
+    end
+  )
+  return true
+end
+
+function on_no_save_timer() end
+
 
 -- функция сравнения для сортировки таймеров
 -- в конце таблицы таймеры с самым маленьким временем
-function timersSort(t1, t2)
-	return t1[2] > t2[2]
+function timersSort( t1, t2 )
+  return t1[ 2 ] > t2[ 2 ]
 end
 
---старт таймера в игровом времени
---function g_start_timer(name,delay_d,delay_h,delay_m,action)
-function g_start_timer(name, delay_d, delay_h, delay_m, parameters)
-	if delay_d==nil or delay_h==nil or delay_m==nil then
-		return false
-	end
 
-	if not parameters then
-		parameters = ""
-	end
-	
-	--get_console():execute("load ~~~ TIMERS start_g_timer: "..name..", "..math_floor(game_milliseconds() + (delay_d*60*24+delay_h*60+delay_m) * 60 * 1000)..", "..parameters)
-	local timers = load_table("timers")
-	--dump_table(timers)
-    
-	table.insert(timers, {name, math_floor(game_milliseconds() + (delay_d*60*24+delay_h*60+delay_m) * 60 * 1000), parameters})
-
-	-- сортируем для оптимизации дальнейшего поиска по таймерам
-	-- таймеры с меньшим временем будут в конце таблицы
-	table_sort(timers, timersSort)
-	
-	save_table("timers", timers)
-	--dump_table(timers)
-	
---[[  local time = game_minutes()
-
-  if delay_d==nil or delay_h==nil or delay_m==nil then
-    return false
+function has_timer( name )
+  for _, t in ipairs( load_table( "timers" ) ) do
+    if t[ 1 ] == name then return true end
   end
-  
-  if action==nil then
-    action = ""
+  return ogse_st_mgr.timer_exists( script_name() .. "." .. name )
+end
+
+
+function remove_timer( name )
+  local tn = script_name() .. "." .. name
+  if ogse_st_mgr.timer_exists( tn ) then
+    ogse_st_mgr.get_timer( tn ):stop()
+  else
+    local timers = load_table( "timers" )
+    for i = table.getn( timers ), 1, -1 do
+      if timers[ i ][ 1 ] == name then
+        table.remove( timers, i )
+        break
+      end
+    end
+    save_table( "timers", timers )
   end
-
-  local a=1
-  while db.storage[db.actor:id()].pstor["gt"..a] do
-    a=a+1
-    if a>100 then 
-      return false 
-    end
-  end
-
-  save_variable("gt"..a, name)
-  save_variable("gd"..a, time+delay_d*60*24+delay_h*60+delay_m)
-  save_variable("gp"..a, action)]]
-
-  return true
 end
 
-function has_timer(name)
-	--get_console():execute("load ~~~ TIMERS has_timer: "..name)
-	local timers = load_table("timers")
-	--dump_table(timers)
-	local result = false
-	for i = 1, #timers do
-		if timers[i][1] == name then
-			result = true
-			break
-		end
-	end
-	
-	return result
---[[  for a=1,100,1 do
-    tmp=load_variable("xt"..a,nil)
-    if tmp and tmp==name then
-      return true
-    end
-  end  
-  return false]]
+
+function has_g_timer( name )
+  return has_timer( name )
 end
 
-function remove_timer(name)
-	--get_console():execute("load ~~~ TIMERS has_timer: "..name)
-	local timers = load_table("timers")
-	--dump_table(timers)
-	for i = #timers, 1, -1 do
-		if timers[i][1] == name then
-			table.remove(timers, i)
-		end
-	end
-
-	-- сортируем для оптимизации дальнейшего поиска по таймерам
-	-- таймеры с меньшим временем будут в конце таблицы
-	table_sort(timers, timersSort)
-	
-	save_table("timers", timers)
-end
-
-function has_g_timer(name)
-	return has_timer(name)
---[[  for a=1,100,1 do
-    tmp=load_variable("gt"..a,nil)
-    if tmp and tmp==name then
-      return true
-    end
-  end  
-  return false]]
-end
 
 -- Временное хранилище для переменных удалённых из pstor
 local emerg_store
@@ -474,7 +447,7 @@ function convert_timers()
 end
 
 
---проверка таймеров
+-- проверка таймеров
 function check_timers()
   local timers = load_table( "timers" )
   -- список таймеров на запуск, которые запустятся после очистки таблицы,
@@ -483,14 +456,14 @@ function check_timers()
   local timersToStart = {}
   local milliseconds  = game_milliseconds()
   -- идём с хвоста по таймерам с наименьшим временем срабатывания
-  for i = #timers, 1, -1 do
-    local name       = timers[ i ][ 1 ]
-    local delay	     = timers[ i ][ 2 ]
-    local parameters = timers[ i ][ 3 ]
-    if type( parameters ) == "table" then
-      parameters = pack_array_to_string( parameters )
-    end
+  for i = table.getn( timers ), 1, -1 do
+    local name  = timers[ i ][ 1 ]
+    local delay	= timers[ i ][ 2 ]
     if delay <= milliseconds then
+      local parameters = timers[ i ][ 3 ]
+      if type( parameters ) == "table" then
+        parameters = pack_array_to_string( parameters )
+      end
       table.insert( timersToStart, { name, parameters } )
       -- сначала чистим таблицу, а то ещё в __do_timer_action() она может быть
       -- дополнена
@@ -578,25 +551,7 @@ local func_by_string = {}
 	func_by_string["stop_tush"] = function (params_string)
 		db.actor:give_info_portion("sidor_music")
 	end
-	-- достижения
-	func_by_string["send_archievement"] = function (params_string)
-		archievements.send_archievement_chunk(params_string)
-	end
 	-- autosave
-	func_by_string["autosave"] = function (params_string)
-		if u3_utils.can_save() then
-			u3_utils.savegame(params_string)
-		else
-			start_timer("autosave", 3, params_string)
-		end
- 	end
-	func_by_string["autosave_blowout"] = function (params_string)
-		if u3_utils.can_save() then
-			u3_utils.savegame_date("Выброс")
-		else
-			start_timer("autosave_blowout", 3, params_string)
-		end
- 	end
 	func_by_string["autosave_hell"] = function (params_string)
 		if u3_utils.can_save() then
 			u3_utils.savegame_date("Час Ужаса")
@@ -608,9 +563,6 @@ local func_by_string = {}
  	end
 	func_by_string["grenade_flash_disable"] = function (params_string)
 		db.actor:disable_info_portion("grenade_flash_blow")
-	end
-	func_by_string["mm_opt"] = function (params_string)
-		db.actor:disable_info_portion("mm_opt")
 	end
 	func_by_string["set_flame_ammo"] = function (params_string)
 		flamethrower.set_flame_ammo(params_string)
@@ -825,52 +777,6 @@ local func_by_string = {}
 	func_by_string["repbox_cond"] = function (params_string)
 		mod_call("after_repair_weapon", params_string)
 	end
-	func_by_string["collect_anomalies_info"] = function (params_string)
-		amk_anoms.collect_info()
-	end
-	func_by_string["timer_drop_obj_varka"] = function (params_string)
-		local tbl = unpack_array_from_string(params_string)
-		local sobj = alife():object(tbl.obj_id)
-		if sobj == nil then
-			-- съели
-			--amk.send_tip("съели","съели",0,15,"gen_info")
-		elseif sobj.parent_id == 65535 then
-			-- выбросили
-			--amk.send_tip("выбросили","выбросили",0,15,"gen_info")
-			-- запускаем проверку на рецепт и, если успешно, варку
-			local obj	= level.object_by_id(tbl.obj_id)
-			local anom	= level.object_by_id(tbl.anom_id)
-			if obj and anom then -- если чего само выпадет или будет вброшено в игру скриптом при переходе ГГ между уровнями, то obj == nil и аномалии тоже не будет
-				local obj_sect	= obj:section()
-				local obj_pos	= obj:position()
-				local anom_sect	= anom:section()
-				local anom_pos	= anom:position()
-				amk_mod.check_af_transform(obj, obj_sect, obj_pos, tbl.anom_id, anom_sect, anom_pos, tbl.anom_radius, tbl.lv, tbl.gv)
-			end
-		else
-			-- переложили
-			--amk.send_tip("переложили","переложили",0,15,"gen_info")
-		end
- 	end
-	func_by_string["timer_drop_obj_transform"] = function (params_string)
-		local tbl = unpack_array_from_string(params_string)
-		local sobj = alife():object(tbl.obj_id)
-		if sobj == nil then
-			-- съели
-			--amk.send_tip("obj_id = "..tbl.obj_id.." type: "..type(tbl.obj_id),"съели",0,15,"gen_info")
-		elseif sobj.parent_id == 65535 then
-			-- выбросили
-			--amk.send_tip("выбросили","выбросили",0,15,"gen_info")
-			-- запускаем трансформацию предмета
-			local obj = level.object_by_id(tbl.obj_id)
-			if obj then
-				amk_mod.item_transform(tbl.obj_id, tbl.lv, tbl.gv)
-			end
-		else
-			-- переложили
-			--amk.send_tip("переложили","переложили",0,15,"gen_info")
-		end
- 	end
 	func_by_string["babah_drop_timeBomb"] = function (params_string)
         local tbl = unpack_array_from_string(params_string)
 		local sobj = alife():object(tbl.id)
@@ -993,38 +899,12 @@ local func_by_string = {}
       esc_fly.spawn(params_string)
     end
 
-function __do_timer_action(select_string,params_string)
-  --[[
-  здесь описываем вызовы, оформялять в виде
-
-  if select_string=="название условия" then
-    <вызов сторонних функций>
-    -- можно передавать npc как параметр
+    
+function __do_timer_action( select_string, params_string )
+  if func_by_string[ select_string ] then
+    func_by_string[ select_string ]( params_string )
   end
-  
-  ]]
---user area
---[[переделал в оптимизированный вид
-объявляем:
-func_by_string["doc_1"] = function (params_string)
-	бла-бла-бла
 end
-объявлять выше перед __do_timer_action --^
-
-вызываем:
-if func_by_srtring[select_string] then
-	func_by_srtring[select_string](params_string)
-end
-
-сухо и комфортно
-]]
-	
-	if func_by_string[select_string] then
-		func_by_string[select_string](params_string)
-	end
-	
-end
---------------------------------------------------------------------------------------------------------------------
 
 
 --спавним объекты на карту
@@ -1487,18 +1367,15 @@ function on_info(npc, info_id)
 	end
 end
 
+
 --колбэк на взятие предмета в инвентарь ГГ
-function on_item_take(obj)
-gps_habar.on_item_take(obj) -- Idler ++--
-    escape_dialog.have_a_art()
-flamethrower.have_a_fire_kolobok()
-flamethrower.have_a_trubki()
-flamethrower.have_a_manometr()
-flamethrower.have_a_vodko()
-flamethrower.have_a_gorelka()
-  remove_spot_from_map(obj:id(),"red_location")
-  mod_call("check_usable_item",obj)
+function on_item_take( obj )
+  gps_habar.on_item_take( obj ) -- Idler ++--
+  flamethrower.have_a_vodko()
+  remove_spot_from_map( obj:id(), "red_location" )
+  mod_call( "check_usable_item", obj )
 end
+
 
 --колбэк на взятие предмета в инвентарь ГГ из ящика
 function on_item_take_from_box(obj, item)
@@ -1670,45 +1547,46 @@ function enemy_see_actor( obj )
 end
 
 
---загружаем все переменные, которые нужно, вызывается загрузке игры, автоматически; вручную не вызывать
+-- загружаем все переменные, которые нужно, вызывается загрузке игры,
+-- автоматически; вручную не вызывать
 function on_game_load()
-	amk.mylog("on_game_load begin")
-	amk.mylog("object 2972 is "..((alife():object(2972) and alife():object(2972):name()) or "") )
-	amk.mylog("object 2975 is "..((alife():object(2975) and alife():object(2975):name()) or "") )
-
-  if db.storage[db.actor:id()].pstor == nil then
-    db.storage[db.actor:id()].pstor = {}
+  if db.storage[ db.actor:id()].pstor == nil then
+    db.storage[ db.actor:id() ].pstor = {}
   end
   
-  npc_spawner=unpack_array_from_string(load_variable("x_npc_spawner","") )
+  npc_spawner = unpack_array_from_string(
+    load_variable( "x_npc_spawner", "" )
+  )
 
-  mod_call("first_run")
+  mod_call( "first_run" )
   convert_timers() -- переносим старые и новые таймеры в таблицу
--- Метки теперь ставятся на серверные объекты. Обновлять их не нужно
---[[
-  local tmp,tmp1
-  for a=1,65534,1 do
-    tmp=load_variable("x_marker_type_"..a,nil)
-    if tmp~=nil then
-      tmp1=load_variable("x_marker_text_"..a,nil)
-      level.map_add_object_spot(a, tmp, tmp1)
-    end
-  end
-]]
   
---user area 
-	if sys_ini:r_float("gg_kick","enabled")>0.0 then gg_kick=true else gg_kick=false end
-  mod_call("check_spawn")
---  local str=string
-  if has_alife_info("val_actor_has_borov_key") and not has_alife_info("val_borov_dead") then
-    db.actor:give_info_portion("val_borov_dead")
+  if sys_ini:r_float( "gg_kick","enabled" ) > 0.0 then
+    gg_kick = true
+  else
+    gg_kick = false
   end
-  
---	gps_habar.on_game_load() --idler++--
+  mod_call( "check_spawn" )
+  if
+    has_alife_info( "val_actor_has_borov_key" )
+    and not has_alife_info( "val_borov_dead" )
+  then
+    db.actor:give_info_portion( "val_borov_dead" )
+  end
 
-	amk.mylog("on_game_load end")
-
+  local timers = load_table( "timers" )
+  if table.getn( timers ) > 0 then
+    log2(
+      "[%s]: found %s timers, subscribing",
+      script_name, table.getn( timers )
+    )
+    ogse_signals.get_mgr():subscribe({
+      signal = "on_update", fun = this.on_actor_upade,
+      [ "script_name" ] = ( script_name() .. ".on_actor_upade" ),
+    })
+  end
 end
+
 
 --записываем все переменные, которые нужно, вызывается присохранении игры, автоматически; вручную не вызывать
 function on_game_save() 

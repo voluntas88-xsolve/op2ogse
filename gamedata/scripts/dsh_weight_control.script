@@ -1,27 +1,46 @@
 -- -*- mode: lua; coding: windows-1251-dos -*-
 
+-- на сколько хватает одного аккумулятора (часов)
+local use_time         = 7 * 24
+-- за сколько часов разрядится аккумулятор при максимальном перегрузе
+local overweight_time  = 12
+-- power_loss для случая отсутствия энергии
+local empty_power_loss = 2
+
+
 function attach( sm )
-  sm:subscribe({
-    signal = "on_before_actor_conditions_update",
-    fun    = this.on_update
-  })
+  sm:subscribe({ signal = "on_drop",         fun = this.remove_outfit })
+  sm:subscribe({ signal = "on_item_to_ruck", fun = this.remove_outfit })
+  sm:subscribe({ signal = "on_item_to_slot", fun = this.use_outfit    })
+  sm:subscribe({ signal = "on_update",       fun = this.on_update     })
+  sm:subscribe({ signal = "on_update",       fun = this.use_power     })
+end
+
+
+function use_outfit( obj )
+  if obj:is_outfit() then
+    recalc_outfit()
+  end
+end
+
+
+function remove_outfit( obj )
+  if obj:is_outfit() and not db.actor:get_current_outfit() then
+    recalc_outfit()
+  end
 end
 
 
 function on_update()
-  if not ( db.actor and db.actor:alive() ) then return end
-  local add_weight
-  local outfit_item = db.actor:get_current_outfit()
-  if
-    outfit_item
-    and outfit_item:section() == "exo_mil_exoskeleton_addrs"
-    and inventory.on_belt( "art_acumm" )
-  then
-    add_weight = 20
-  end
-  set_weight_parameters( add_weight )
+  ogse_signals.get_mgr():reschedule( 1000 )
+  if not db.actor:alive() then return end
+  recalc_outfit()
+end
+
+
+function recalc_outfit()
+  set_weight_parameters()
   set_radiation_protection()
-  set_power_loss()
 end
 
 
@@ -31,37 +50,72 @@ local def_max_walk_weight = get_float(
 )
 
 
-function set_weight_parameters( add_weight )
-  local outfit_item     = db.actor:get_current_outfit()
-  local max_weight      = def_max_weight
-  local max_walk_weight = def_max_walk_weight
-  if outfit_item then -- проверка нужна на время переодевания костюма
-    local sect = outfit_item:section()
-    -- это херня, что добавляемый вес не зависит от состояния экзы. исправим.
-    local condition_for_weight_calc = outfit_item:condition()
-    local walk_weight = get_float( sect, "additional_inventory_weight", 0 )
-    if walk_weight > 0 then
-      max_walk_weight = max_walk_weight + walk_weight * (
-        condition_for_weight_calc - 1
-      ) -- движок тоже прибавляет вес, так что учтем это
-      if add_weight then
-        max_walk_weight = max_walk_weight + add_weight
-      end
-    end
-    local weight = get_float( sect, "additional_inventory_weight2", 0 )
-    if weight > 0 then
-      max_weight = max_weight + weight * (
-        condition_for_weight_calc - 1
-      ) -- движок тоже прибавляет вес, так что учтем это
-      if add_weight then
-        max_weight = max_weight + add_weight
-      end
-    end
+local on_power_mode = false
+local pt
+
+function set_weight_parameters()
+  local dt
+  if pt then
+    local prev_pt = game.CTime()
+    prev_pt:set( unpack( pt ) )
+    local cur_t = game.get_game_time()
+    dt = cur_t:diffSec( prev_pt )
+    pt = { cur_t:get() }
+  else
+    dt = 0
+    pt = { game.get_game_time():get() }
   end
-  if max_walk_weight < 0 then max_walk_weight = 0.1 end
-  if max_weight      < 0 then max_weight      = 0.1 end
-  db.actor:set_actor_max_weight( max_weight )
-  db.actor:set_actor_max_walk_weight( max_walk_weight )
+  on_power_mode = false
+  local ext = {
+    [ "actor_max_walk_weight"  ] = 0,
+    [ "actor_max_weight"       ] = 0,
+    [ "outfit_max_walk_weight" ] = 0,
+    [ "outfit_max_weight"      ] = 0,
+  }
+  ogse_signals.get_mgr():call( "on_before_set_actor_max_weights", ext )
+  local outfit = db.actor:get_current_outfit()
+  if outfit then
+    local cond   = outfit:condition()
+    local params = get_outfit_params( outfit:section() )
+    local outfit_max_walk_weight, outfit_max_weight = 0, 0
+    if params.use_power then
+      local power_loss = params.power_loss
+      if have_power( dt ) then
+        outfit_max_weight      = params.outfit_max_weight + ext.outfit_max_weight
+        outfit_max_walk_weight = params.outfit_max_walk_weight
+          + ext.outfit_max_walk_weight
+        on_power_mode = true
+      else
+        power_loss = empty_power_loss
+      end
+      if cond < 0.8 then
+        power_loss = power_loss + ( 10 - power_loss ) * ( 0.8 - cond )
+      end
+      set_outfit_power_loss( outfit, power_loss )
+    else
+      outfit_max_weight      = params.outfit_max_weight + ext.outfit_max_weight
+      outfit_max_walk_weight = params.outfit_max_walk_weight
+        + ext.outfit_max_walk_weight
+    end
+    db.actor:set_actor_max_weight(
+      def_max_weight
+        + inventory.on_belt_restore_speed( "additional_inventory_weight2" )
+        + ext.actor_max_weight
+        + outfit_max_weight * cond
+    )
+    db.actor:set_actor_max_walk_weight(
+      def_max_walk_weight
+        + inventory.on_belt_restore_speed( "additional_inventory_weight"  )
+        + ext.actor_max_walk_weight
+        + outfit_max_walk_weight * cond
+    )
+  else
+    pt = nil
+    db.actor:set_actor_max_weight( def_max_weight + ext.actor_max_weight )
+    db.actor:set_actor_max_walk_weight(
+      def_max_walk_weight + ext.actor_max_walk_weight
+    )
+  end
 end
 
 
@@ -85,7 +139,7 @@ function set_radiation_protection()
     end
   else
     for _, k in ipairs( protections ) do
-      set_outfit_protection( outfit, k, get_float( outfit:section(), k, 0 ) )
+      set_outfit_protection( outfit, k, params[ k ] )
     end
   end
 end
@@ -95,22 +149,96 @@ local params_cache = {}
 function get_outfit_params( sect )
   if not params_cache[ sect ] then
     local t = {}
+    t.outfit_max_walk_weight  = get_float(
+      sect, script_name() .. ".max_walk_weight",  0
+    )
+    t.outfit_max_weight = get_float(
+      sect, script_name() .. ".max_weight", 0
+    )
+    t.use_power  = get_bool( sect, script_name() .. ".use_power", false )
     t.helmet     = get_bool( sect, "dynamic_hud_enable", false )
     t.power_loss = get_float( sect, "power_loss", 1.0 )
+    t.radiation_protection = get_float( sect, "radiation_protection", 0 )
+    t.telepatic_protection = get_float( sect, "telepatic_protection", 0 )
     params_cache[ sect ] = t
   end
   return params_cache[ sect ]
 end
 
 
-function set_power_loss()
-  local outfit = db.actor:get_current_outfit()
-  if not outfit then return end
-  local params = get_outfit_params( outfit:section() )
-  local power_loss  = params.power_loss
-  if outfit:condition() < 0.8 then
-    power_loss = power_loss + ( 10 - power_loss ) * ( 1 - outfit:condition() )
+local on_power_dt, on_power_dt_k = 0, 0
+
+function have_power( dt )
+  local found = find_power()
+  if table.getn( found ) >= 2 then
+    if dt > 0 then
+      local k = get_power_k()
+      if k > 0 then
+        on_power_dt   = on_power_dt   + dt
+        on_power_dt_k = on_power_dt_k + dt * k
+      end
+    end
+    return true
   end
-  set_outfit_power_loss( outfit, power_loss )
+  return false
 end
 
+
+function find_power()
+  local found = {}
+  local items = inventory.on_belt_obj( "ekza_akkumul" )
+  if items and table.getn( items ) >= 2 then
+    for _, obj in ipairs( items ) do
+      if obj:condition() > 0 then
+        table.insert( found, obj )
+      end
+    end
+  end
+  return found
+end
+
+
+function use_power()
+  ogse_signals.get_mgr():reschedule( 10000 )
+  if not db.actor:alive() then return end
+  if on_power_mode then
+    local found = find_power()
+    local used  = on_power_dt_k / ( use_time * 3600 )
+    for _, obj in ipairs( found ) do
+      local cond = obj:condition()
+      if cond > used then
+        dsh.set_condition( obj, cond - used )
+      else
+        dsh.set_condition( obj, 0 )
+      end
+    end
+    ogse_signals.get_mgr():call( "on_outfit_use_power", on_power_dt )
+  end
+  on_power_dt, on_power_dt_k = 0, 0
+end
+
+
+function get_power_mode()
+  return on_power_mode
+end
+
+
+function get_power_k()
+  local k = 0
+  if
+    db.actor:is_actor_walking()
+    or db.actor:is_actor_running()
+    or db.actor:is_actor_crouching()
+    or db.actor:is_actor_creeping()
+    or db.actor:is_actor_climbing()
+  then
+    k = 1
+  elseif db.actor:is_actor_sprinting() then
+    k = 2
+  end
+  local overweight = ogse_actor_conditions_mgr.get_overweight_power()
+  if overweight < 1 then
+    k = k * ( use_time / overweight_time * ( 1 - overweight ) )
+  end
+  return k
+end

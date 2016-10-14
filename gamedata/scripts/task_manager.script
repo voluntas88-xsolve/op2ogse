@@ -1,18 +1,5 @@
 -- -*- mode: lua; coding: windows-1251-dos -*-
 
-function attach( sm )
-  sm:subscribe({ signal = "on_update", fun = this.on_update })
-end
-
-
-local update_t
-function on_update()
-  if update_t and update_t > time_global() then return end
-  actor_update()
-  update_t = time_global() + 1000
-end
-
-
 local table_remove = table.remove
 local string_len = string.len
 local string_sub = string.sub
@@ -148,6 +135,9 @@ function CRandomTask:__init()
 		if self.task_ini:line_exist(sect_id, "target") then
 			curr_task_info.target		= self.task_ini:r_string(sect_id, "target")
 		end
+		if self.task_ini:line_exist(id, "info") then
+			curr_task_info.info		= self.task_ini:r_string(sect_id, "info")
+		end
 		if self.task_ini:line_exist(sect_id, "text") then
 			curr_task_info.text			= self.task_ini:r_string(sect_id, "text")
 		end
@@ -248,6 +238,13 @@ function CRandomTask:__init()
     --' По самовыдаваемости
     if v.init_condition ~= nil then
       self.task_id_self_inited[#self.task_id_self_inited+1] = k
+      if not self.subscribed then
+        self.subscribed = {
+          signal = "on_update", self = self, fun = this.actor_update,
+          script_name = script_name(),
+        }
+        ogse_signals.get_mgr():subscribe( self.subscribed )
+      end
     end
   end
 end
@@ -317,8 +314,8 @@ function CRandomTask:save( p )
     p:w_bool( v.enabled_props )
     ASSERT( status_to_num[ v.status ], "Wrong status '%s' for task %s!", v.status, k )
     p:w_u8( status_to_num[ v.status ] )
-    p:w_u32( v.selected_target or -1 )
-    p:w_u32( v.defend_target   or -1 )
+    p:w_u32( v.selected_target or 4294967295 )
+    p:w_u32( v.defend_target   or 4294967295 )
     utils.w_CTime( p, v.last_task_time )
   end
 
@@ -354,11 +351,11 @@ function CRandomTask:load( p )
         self.task_info[ id ].enabled_props = p:r_bool()
         self.task_info[ id ].status        = p:r_stringZ()
         local selected_target = p:r_u32()
-        if selected_target ~= -1 then
+        if selected_target ~= 4294967295 then
           self.task_info[ id ].selected_target = selected_target
         end
         local defend_target = p:r_u32()
-        if defend_target ~= -1 then
+        if defend_target ~= 4294967295 then
           self.task_info[ id ].defend_target = defend_target
         end
         self.task_info[ id ].last_task_time = utils.r_CTime( p )
@@ -383,11 +380,11 @@ function CRandomTask:load( p )
       info.enabled_props = p:r_bool()
       info.status        = num_to_status[ p:r_u8() ]
       local selected_target = p:r_u32()
-      if selected_target ~= -1 then
+      if selected_target ~= 4294967295 then
         info.selected_target = selected_target
       end
       local defend_target = p:r_u32()
-      if defend_target ~= -1 then
+      if defend_target ~= 4294967295 then
         info.defend_target = defend_target
       end
       info.last_task_time = utils.r_CTime( p )
@@ -605,6 +602,9 @@ function CRandomTask:task_complete(p1, p2)
       local oo = alife():object(sel_task.selected_target)
       if oo and oo.gulag:get_population_comed() == 0 then
         self.task_info[self.active_task_by_type[p1]].status = "completed"
+        if self.task_info[self.active_task_by_type[p1]].info then
+          db.actor:give_info_portion(self.task_info[self.active_task_by_type[p1]].info)
+        end
         return true
       end
     elseif string.find(p1, "defend_lager") ~= nil then
@@ -889,6 +889,7 @@ function CRandomTask:check_task_props(task_id)
 end
 --' Проверяем можем ли мы сейчас выдать какой либо самоинициализующийся таск
 function CRandomTask:actor_update()
+  ogse_signals.get_mgr():reschedule( 1000 )
   for k,v in pairs(self.task_id_self_inited) do
     if self.task_info[v].status == "normal" then
       self:check_task_props(v)

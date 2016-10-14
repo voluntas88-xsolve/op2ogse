@@ -1185,6 +1185,8 @@ slot 				= 8
 animation_slot                  = 11
 belt				= true
 
+bind_det_arts.level = 2
+
 
 [detektor_amorf]:identity_immunities
 GroupControlSection	        = spawn_group
@@ -1215,6 +1217,8 @@ slot 				= 8
 animation_slot          = 11
 belt				= true
 
+bind_det_arts.level = 2
+
 
 [det_artefact_indy]:identity_immunities
 GroupControlSection	        = spawn_group
@@ -1244,6 +1248,8 @@ cost                            = 5000
 slot 				= 8
 animation_slot          = 11
 belt				= true
+
+bind_det_arts.level = 1
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1306,7 +1312,7 @@ hud = wpn_sigaret_hud
 
 [sigaret]:sigaret_a
 $spawn = "food and drugs\sigaret"
-class  = II_FOOD
+class  = II_ANTIR ;II_FOOD
 dsh_hud_fx.fx         = sigaret_medkit
 dsh_hud_fx.use_sound  = interface\misery\inv_smoke
 dsh_medkit.dsh_hud_fx = true
@@ -1374,7 +1380,7 @@ hud = wpn_cigara_hud
 
 [cigara]:cigara_a
 $spawn = "food and drugs\cigara"
-class  = II_FOOD
+class  = II_ANTIR ;II_FOOD
 dsh_hud_fx.fx         = sigaret_medkit
 dsh_hud_fx.use_sound  = interface\misery\inv_smoke
 dsh_medkit.dsh_hud_fx = true
@@ -1412,7 +1418,7 @@ visual				= new_item\sandwich.ogf
 inv_name			= "Бутерброд"
 inv_name_short		= "Бутерброд"
 description		= "Обычный бутерброд с колбасой"
-inv_weight			= 0.06
+inv_weight			= 0.1 ;0.06
 
 inv_grid_width     = 1
 inv_grid_height    = 1
@@ -1495,12 +1501,12 @@ $spawn 				= "food and drugs\flaska"
 class				= II_BOTTL
 cform				= skeleton
 visual				= new_item\flaska
-description			= "Фляжка с водой. Придает сил и улучшает самочувствие."
+description			= flaska_descr
 
 ef_weapon_type		= 0
 
-inv_name			= "Фляжка"
-inv_name_short		= "Фляжка"
+inv_name			= flaska_name
+inv_name_short		= flaska_name
 inv_weight			= 0.5	;0.2
 
 inv_grid_width     = 1
@@ -1528,7 +1534,7 @@ eat_power		= 0.5
 eat_radiation	= 0
 eat_alcohol		= 0
 wounds_heal_perc 	= 0.1
-eat_portions_num 	= -1
+eat_portions_num 	= 1000000
 
 ; food item
 slot				= 4
@@ -1537,8 +1543,8 @@ animation_slot		= 4
 ;hud item
 hud = wpn_vodka_hud
 
-dsh_hud_fx.fx        = flaska
 dsh_hud_fx.use_sound = interface\misery\inv_drink_flask_2
+dsh_medkit.apply     = false
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;	сладость
@@ -1589,7 +1595,7 @@ animation_slot		= 4
 hud = wpn_vodka_hud
 
 dsh_hud_fx.fx        = sigaret
-dsh_hud_fx.use_sound = interface\misery\inv_eat_paperwrap_2
+dsh_hud_fx.use_sound = interface\alkseur\sweetness ;misery\inv_eat_paperwrap_2
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;	Коробка сигар
@@ -1685,6 +1691,9 @@ inv_grid_x         = 42
 inv_grid_y         = 12
 cost			    = 0
 
+watcher_act.bad_item = true
+
+
 [money_loot]:identity_immunities
 GroupControlSection	= spawn_group
 discovery_dependency = 
@@ -1720,8 +1729,49 @@ animation_slot		= 4
 ;hud item
 hud = wpn_vodka_hud
 
+bind_stalker.on_take_call = buusty_dialog.use_money
 dsh_hud_fx.fx        = zvuki
 dsh_hud_fx.use_sound = zwuk\inv_money_1,zwuk\inv_money_2,zwuk\inv_money_3,zwuk\inv_money_4
+
+
+[batt_torch]:identity_immunities
+GroupControlSection	= spawn_group
+discovery_dependency =
+$spawn 			= "food and drugs\antirad"
+$prefetch 		= 32
+class			= II_ANTIR
+cform           = skeleton
+visual				= new_item\duracell.ogf
+description			= enc_item_battery_05
+
+inv_name_short		= item_battery_05
+inv_name			= item_battery_05
+inv_weight			= 0.06
+
+inv_grid_width		= 1
+inv_grid_height		= 1
+inv_grid_x			= 80
+inv_grid_y			= 78
+cost				= 300
+
+; eatable item
+eat_health			= 0
+eat_satiety			= 0
+eat_power			= 0
+eat_radiation		= 0
+
+wounds_heal_perc	= 0
+eat_portions_num = 1
+
+; food item
+animation_slot		= 4
+
+;hud item
+hud = wpn_vodka_hud
+
+dsh_hud_fx.fx        = recharge_torch
+dsh_hud_fx.use_sound = device\alkseur\use_battery
+dsh_rukzak.override_game_type = other
 
 
 ; переделано на поршни - при выбросе снимаем все поршни, при спавне артов на локе выдаем - это больше не нужно

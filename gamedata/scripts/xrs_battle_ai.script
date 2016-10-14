@@ -63,7 +63,7 @@ local game_difficulty = level.get_game_difficulty()
 local diff_level = game_difficulty_by_num[game_difficulty]	
 
 -- рестрикшены, которые нельзя восстанавливать если они были сняты, находятся в скриптe _g
-local restrictions_off = true --false
+local restrictions_off = true
 
 local low_range_npc_aggr = 30
 local far_range_mon_aggr = 50 --25
@@ -151,10 +151,10 @@ local intros_by_diff = {
 		["master"]		= 200
 	},
 	["gd_master"] = {
-		["novice"]		= 200, --400,
-		["experienced"]		= 150, --300,
-		["veteran"]		= 100, --200,
-		["master"]		=  50, --100
+		["novice"]		= 400,
+		["experienced"]		= 300,
+		["veteran"]		= 200,
+		["master"]		= 100
 	}
 }
 
@@ -196,51 +196,53 @@ local times_to_aim_by_diff = {
 local time_to_aim = times_to_aim_by_diff[diff_level]
 
 --- отклонение прицела
-
 local deviation_by_diff = {
-	["gd_novice"] = {
-		["novice"]		= {x = 0.16, y = 0.16, z = 0.16},
-		["experienced"]	= {x = 0.12, y = 0.12, z = 0.12},
-		["veteran"]		= {x = 0.10, y = 0.10, z = 0.10},
-		["master"]		= {x = 0.08, y = 0.08, z = 0.08}
-	},
-	["gd_stalker"] = {
-		["novice"]		= {x = 0.14, y = 0.14, z = 0.14},
-		["experienced"]	= {x = 0.10, y = 0.10, z = 0.10},
-		["veteran"]		= {x = 0.08, y = 0.08, z = 0.08},
-		["master"]		= {x = 0.06, y = 0.06, z = 0.06}
-	},
-	["gd_veteran"] = {
-		["novice"]		= {x = 0.12, y = 0.12, z = 0.12},
-		["experienced"]	= {x = 0.08, y = 0.08, z = 0.08},
-		["veteran"]		= {x = 0.06, y = 0.06, z = 0.06},
-		["master"]		= {x = 0.04, y = 0.04, z = 0.04}
-	},
-	["gd_master"] = {
-		["novice"]		= {x = 0.06, y = 0.06, z = 0.06},
-		["experienced"]	= {x = 0.04, y = 0.04, z = 0.04},
-		["veteran"]		= {x = 0.02, y = 0.02, z = 0.02},
-		["master"]		= {x = 0.00, y = 0.00, z = 0.00}
-	}
+  [ "gd_novice"  ] = {
+    [ "novice"      ] = 1.6,
+    [ "experienced" ] = 1.4,
+    [ "veteran"     ] = 1.2,
+    [ "master"      ] = 0.8,
+  },
+  [ "gd_stalker" ] = {
+    [ "novice"      ] = 1.4,
+    [ "experienced" ] = 1.2,
+    [ "veteran"     ] = 0.8,
+    [ "master"      ] = 0.6,
+  },
+  [ "gd_veteran" ] = {
+    [ "novice"      ] = 1.2,
+    [ "experienced" ] = 0.8,
+    [ "veteran"     ] = 0.6,
+    [ "master"      ] = 0.4,
+  },
+  [ "gd_master"  ] = {
+    [ "novice"      ] = 0.8,
+    [ "experienced" ] = 0.6,
+    [ "veteran"     ] = 0.4,
+    [ "master"      ] = 0.2,
+  }
 }
-
-local deviation_table = deviation_by_diff[diff_level]
+local deviation_table = deviation_by_diff[ diff_level ]
 
 --- коэффициент отклонения по коммунити
 
 local community_deviation_coeff = {
-	["trader"] = 1, 
-	["stalker"] = 1, 
-	["dolg"] = 0.8, 
-	["freedom"] = 1, 
-	["bandit"] = 1.1, 
-	["military"] = 0.6, 
-	["zombied"] = 3, 
-	["ecolog"] = 1.3, 
-	["killer"] = 0.3, 
-	["monolith"] = 0.2,
-	["nebo"] = 1, 
-	["quest_stalker"] = 1
+  [ "lastday"       ] =  1,
+  [ "monolith"      ] =  1,
+  [ "killer"        ] =  1.5,
+  [ "military"      ] =  1.5,
+  [ "sniper"        ] =  1.5,
+  [ "dolg"          ] =  2,
+  [ "vermaht"       ] =  2,
+  [ "bandit"        ] =  2.5,
+  [ "freedom"       ] =  2.5,
+  [ "green"         ] =  2.5,
+  [ "nebo"          ] =  2.5,
+  [ "stalker"       ] =  2.5,
+  [ "trader"        ] =  2.5,
+  [ "quest_stalker" ] =  2.5,
+  [ "ecolog"        ] =  3,
+  [ "zombied"       ] = 15,
 }
 
 --- группировки с улучшенной координацией (имеют радиосвязь, соотв. об одной цели сразу знают все члены группировки)
@@ -561,15 +563,19 @@ function evaluator_check_altcombat:evaluate()
 		in_combat[self.object:id()] = nil
 		return false
 	end	
-	local act_item = self.object:item_in_slot(self.object:active_slot())
+
 	local bw = nil
 	local wm = rx_wmgr and rx_wmgr.get_wm(self.object)
-	if not act_item then
-		bw = (wm and wm:get_weapon()) or self.object:best_weapon()
+	
+	local sl = self.object:active_slot()
+	if sl ~= 4294967295 and self.object:item_in_slot(sl) then
+		bw = self.object:item_in_slot(sl)
 	else
-		bw = act_item
+		bw = (wm and wm:get_weapon()) or self.object:best_weapon()
 	end
+
 	local npc_rank = ranks.get_obj_rank_name(self.object)
+--[=[
 	if not bw then
 		local knife = self.object:object("wpn_knife")
 		if not knife then
@@ -590,6 +596,7 @@ function evaluator_check_altcombat:evaluate()
 	else	
 		knife_scheme[self.object:id()] = nil
 	end
+--]=]
 
 	if self.st.script_combat_type == "zombied"  then
 		-- monolith[self.object:id()] = true
@@ -724,14 +731,13 @@ function action_altcombat:execute()
 	end
 	
 	-- получим текущее оружие
-	
-	local act_item = npc:item_in_slot(npc:active_slot())
 	local bw = nil
-	if not act_item then
-		local wm = rx_wmgr and rx_wmgr.get_wm(npc)
-		bw = (wm and wm:get_weapon()) or npc:best_weapon()
+	local wm = rx_wmgr and rx_wmgr.get_wm(npc)
+	local sl = npc:active_slot()
+	if sl ~= 4294967295 and npc:item_in_slot(sl) then
+		bw = npc:item_in_slot(sl)
 	else
-		bw = act_item
+		bw = (wm and wm:get_weapon()) or npc:best_weapon()
 	end
 
 	-- если ещё свежий труп
@@ -871,10 +877,9 @@ function action_altcombat:execute()
 	local last_algorythm = "no"
 	
 	local raytrace_see = false
-	local fps_check = ogse_benchmark.get_fps()
 	
 	if be:id() == db.actor:id() then
-		if use_raytrace and fps_check > raytrace_fps_limit then
+		if use_raytrace then
 			raytrace_see = actor_see_raytrace(npc)
 		else
 			raytrace_see = actor_see(npc)
@@ -1261,7 +1266,9 @@ function action_altcombat:check_objects(npc)
 end
 function action_altcombat:check_single_object(obj)
 	local npc = self.object
-	if obj and obj.clsid and obj:alive() and npc:id()~=obj:id() then
+	if not obj then return end
+	if not (IsStalker(obj) or IsMonster(obj)) then return end
+	if obj.clsid and obj:alive() and npc:id()~=obj:id() then
 		if IsStalker(obj) and not primary_target[npc:id()] == obj:id() then 
 			self.objects[npc:relation(obj)][obj:id()] = obj
 		elseif IsMonster(obj) then
@@ -1284,7 +1291,7 @@ function action_altcombat:check_npc_on_fire_line(obj)
 			
 			local friend_pos = obj:bone_position("bip01_spine")
 			local radius = 3
-	--		local friend_dist=npc_pos:distance_to(be_pos)-radius
+			local friend_dist=npc_pos:distance_to(be_pos)-radius
 			
 			if IsRPG(weapon) then
 				local effective_radius = be_pos:distance_to(friend_pos)
@@ -1296,28 +1303,16 @@ function action_altcombat:check_npc_on_fire_line(obj)
 			end
 
 			if be_dist > 5 then --and friend_dist < be_dist then -- убрано чтобы не стреляли не только когда непись между врагом но и за ним непосредственно
+ 				-- направления на врага и друга
+				--считаем попадает ли текущий солдат в сектор обстрела
 				local dir_aim = utils.vector_copy_by_val(be_pos):sub(npc_pos)
 				local dir_obj = utils.vector_copy_by_val(friend_pos):sub(npc_pos)
-				
-				-- половинный угловой размер друга
-				local friend_dist = npc_pos:distance_to(friend_pos)
-				local cos_angle = 1/sqrt(1 + radius*radius/(friend_dist*friend_dist*4))
-				
-				-- угол между направлениями на врага и друга
-				dir_aim:normalize()
-				dir_obj:normalize()
-				local cos_aim_obj = dir_aim:dotproduct(dir_obj)
-				
-				-- проверяем попадание в друга
-				if cos_aim_obj > cos_angle then
-					return true
-				end
-	--[[			local x=dir_obj.x*dir_aim.x+dir_obj.z*dir_aim.z
+				local x=dir_obj.x*dir_aim.x+dir_obj.z*dir_aim.z
 				local y=-dir_obj.z*dir_aim.x+dir_obj.x*dir_aim.z -- повернули систему координат     
 				local angle=math.atan2(y,x) -- угол доворота от -180 до 180   
 				
 				local div=radius/friend_dist
-				if angle >= -div and angle <= div then return true end]]
+				if angle >= -div and angle <= div then return true end
 			end
 		end
 	
@@ -1506,7 +1501,9 @@ function hit_fx( obj, amount, who, bone_index )
 		return
 	end
 	
-	local active_item = obj:item_in_slot(obj:active_slot())
+	local active_slot = obj:active_slot()
+	if active_slot == 4294967295 then return end
+	local active_item = obj:item_in_slot(active_slot)
 	if not active_item or active_item:section() == "bolt" then
 		return
 	end
@@ -1644,11 +1641,11 @@ function hit_callback(  obj, amount, local_direction, who, bone_index )
 								register_as_target(obj, who)
 							end
 						end
-						obj:make_object_visible_somewhen(who)
+						-- obj:make_object_visible_somewhen(who)
 					else
 						enable_object(obj, who)
 						process_enemy(obj, who)
-						obj:make_object_visible_somewhen(who)
+						-- obj:make_object_visible_somewhen(who)
 					end
 				elseif targets_list[npc:id()] and targets_list[npc:id()][who:id()] then
 					local enemy_record = targets_list[npc:id()][who:id()]
@@ -1674,7 +1671,7 @@ function hit_callback(  obj, amount, local_direction, who, bone_index )
 				if targets_list[npc:id()] and not targets_list[npc:id()][who:id()] then
 					enable_object(obj, who)
 					process_enemy(obj, who)
-					obj:make_object_visible_somewhen(who)
+					-- obj:make_object_visible_somewhen(who)
 				elseif targets_list[npc:id()] and targets_list[npc:id()][who:id()] then
 					local enemy_record = targets_list[npc:id()][who:id()]
 					enemy_record.last_time_seen = time_global()
@@ -1685,7 +1682,7 @@ function hit_callback(  obj, amount, local_direction, who, bone_index )
 			if targets_list[npc:id()] and not targets_list[npc:id()][who:id()] then
 				enable_object(obj, who)
 				process_enemy(obj, who)
-				obj:make_object_visible_somewhen(who)
+				-- obj:make_object_visible_somewhen(who)
 			elseif targets_list[npc:id()] and targets_list[npc:id()][who:id()] then
 				local enemy_record = targets_list[npc:id()][who:id()]
 				enemy_record.last_time_seen = time_global()
@@ -1777,7 +1774,7 @@ function its_a_trap(npc, vertex)
 				and not xr_wounded.is_wounded(enemy) then
 					return true
 				end
-				if enemy and ((not enemy:alive()) or (is_armor(enemy) and not armor_alive(enemy))) then
+				if enemy and ((is_armor(enemy) and not armor_alive(enemy)) or (not enemy:alive())) then
 					death_places[k] = nil
 				end
 			end			
@@ -1832,7 +1829,7 @@ function we_are_under_attack(npc, enemy)
 		local danger_by_engine = enemy:best_danger()
 		local best_danger_object = nil
 		local bd_type = nil
-		if danger_by_engine and check_is_enemy(npc, enemy) and xr_danger.check_in_danger(npc) then
+		if danger_by_engine and check_is_enemy(npc, enemy) then
 			best_danger_object = danger_by_engine:object()
 		end
 		if not target and best_danger_object then
@@ -1846,8 +1843,7 @@ function we_are_under_attack(npc, enemy)
 			(IsStalker(target) and 
 			target:alive() and
 			(npc:relation(target) == game_object.friend or 
-			npc:character_community() == target:character_community()) and
-			(npc:see(target) or target:see(npc))
+			npc:character_community() == target:character_community())
 			)
 			then
 				return true
@@ -1860,26 +1856,17 @@ function we_are_under_attack(npc, enemy)
 	else
 		if check_is_enemy(npc, db.actor) then
 		
-			local raytrace_see = false
-			local see_actor = npc:see(db.actor)
-			local fps_check = ogse_benchmark.get_fps()
-			if use_raytrace and fps_check > raytrace_fps_limit then
-				raytrace_see = actor_see_raytrace(npc)
-			else
-				raytrace_see = actor_see(npc)
-			end		
-		
 			local be 		= npc:best_enemy()
 			local bd 		= npc:best_danger()
 			local bd_obj 	= nil
-			if bd and xr_danger.check_in_danger(npc) then
+			if bd then
 				bd_obj = bd:object()
 			end
-			if be and be:id() == db.actor:id() and (raytrace_see or see_actor) then
+			if be and be:id() == db.actor:id() then
 				return true
 			elseif bd_obj and bd_obj:id() == db.actor:id() then
 				local bd_type = bd:type()
-				if needed_dangers[bd_type] and (raytrace_see or see_actor) then
+				if needed_dangers[bd_type] then
 					return true
 				end
 			else	
@@ -2175,7 +2162,7 @@ function refresh_targets(npc)
 	end
 	-- добавление нападающего денжера
 	local danger_by_engine = npc:best_danger()
-	if danger_by_engine and xr_danger.check_in_danger(npc) then
+	if danger_by_engine then
 		local best_danger_object = danger_by_engine:object()
 		if best_danger_object then
 			local bd_type = danger_by_engine:type()		
@@ -2445,7 +2432,11 @@ end
 function get_max_weapon_range(npc)
 	-- служебная для проверки достанет ли оружие
 	if npc then
-		local act_item = npc:item_in_slot(npc:active_slot())
+		local a_sl = npc:active_slot()
+		if a_sl == 4294967295 then
+			return 36.0
+		end
+		local act_item = npc:item_in_slot(a_sl)
 		local ini = system_ini()
 		if act_item then
 			local sect = act_item:section()
@@ -2930,12 +2921,9 @@ function set_weapons_fire( npc, enemy, weapon, override_vis, npc_rank )
 		local distance = npc_pos:distance_to(be_pos)
 		
 		write_log("--XRS_BATTLE_AI: WPNS_FIRE_1 "..npc:name().." : "..tostring(enemy:id()))
-		
-		local fps_check = ogse_benchmark.get_fps()
-		
 		write_log("--XRS_BATTLE_AI: WPNS_FIRE_2 "..npc:name().." : "..tostring(enemy:id()))
 		
-		if use_raytrace and fps_check > raytrace_fps_limit then
+		if use_raytrace then
 		
 			write_log("--XRS_BATTLE_AI: WPNS_FIRE_2_RTC_1 "..npc:name().." : "..tostring(enemy:id()))
 			
@@ -2996,9 +2984,6 @@ function set_weapons_fire( npc, enemy, weapon, override_vis, npc_rank )
 				type_of_fire = object.fire1
 			end
 			
-		elseif use_raytrace and fps_check <= raytrace_fps_limit then	
-			write_log("--XRS_BATTLE_AI: RAYTRACE FPS TOO LOW - FIRING AT WILL "..npc:name().." : "..tostring(enemy:id()))
-			type_of_fire = object.fire1
 		else	
 			write_log("--XRS_BATTLE_AI: RAYTRACE SWITCHED OFF - FIRING AT WILL "..npc:name().." : "..tostring(enemy:id()))
 			type_of_fire = object.fire1			
@@ -3040,7 +3025,11 @@ function set_weapons_fire( npc, enemy, weapon, override_vis, npc_rank )
 		elseif IsRPG(weapon) then
 			npc:set_item(type_of_fire, weapon, 1, time_aim.rpg)			
 		else
-			local qs = get_u32( weapon:section(), "preffered_fire_mode", 5 )
+			local qs = get_u32(
+			  weapon:section(),
+			  script_name() .. ".preffered_fire_mode",
+			  5
+			)
 			npc:set_item( type_of_fire, weapon, qs, time_aim.other )
 		end
 		
@@ -3177,21 +3166,31 @@ function set_transfer_state(npc, enemy)
 	write_log("!!XRS_BATTLE_AI: set_transfer_state end for "..npc:name())
 end
 
-function add_deviation(npc, position, weapon, distance)
-	local npc_rank = ranks.get_obj_rank_name(npc)
-	local npc_comm = npc:character_community()
-	local deviations = deviation_table[npc_rank]
-	local dev_coeff = community_deviation_coeff[npc_comm] or 1
-	if distance > 50 then
-	  return position
-	end
-	if deviations then
-		position.x = position.x + math.random( (deviations.x*(-1))*dev_coeff, (deviations.x)*dev_coeff )
-		position.y = position.y + math.random( (deviations.y*(-1))*dev_coeff, (deviations.y)*dev_coeff )
-		position.z = position.z + math.random( (deviations.z*(-1))*dev_coeff, (deviations.z)*dev_coeff )
-	end
-	return position
+
+function add_deviation( npc, position, weapon, distance, enemy )
+  local npc_rank   = ranks.get_obj_rank_name( npc )
+  local npc_comm   = npc:character_community()
+  local deviations = deviation_table[ npc_rank ]
+  local dev_coeff  = community_deviation_coeff[ npc_comm ] or 1
+  if deviations then
+    local max = deviations * dev_coeff
+    if enemy:id() == db.actor:id() then
+      local k = 1 - inventory.on_belt_hit_immunity( "fire_wound_immunity" )
+      if k > 0 then
+        max = max * k
+      else
+        max = 0
+      end
+    end
+    if max > 0 then
+      position.x = position.x + ( max * 2 * math.random() - max )
+      position.y = position.y + ( max * 2 * math.random() - max )
+      position.z = position.z + ( max * 2 * math.random() - max )
+    end
+  end
+  return position
 end
+
 
 function set_escape_sight(npc, vertex)
 
@@ -3219,17 +3218,17 @@ function set_combat_sight(npc, enemy, weapon)
 	local enemy_pos = enemy:position()
 	local npc_pos = npc:position()
 	local direction = npc_pos:sub(enemy_pos)
-	local bodystate = enemy:body_state()
 	local distance = npc_pos:distance_to(enemy_pos)
 
 	if IsStalker(enemy) then
+		local bodystate = enemy:body_state()
 		if IsShotgun(weapon) then
 			if enemy_pos.y < (npc_pos.y - 1) then
-				look_pos = add_deviation(npc, enemy:bone_position("bip01_head"), weapon, distance)
+				look_pos = add_deviation(npc, enemy:bone_position("bip01_head"), weapon, distance, enemy)
 			else
-				look_pos = add_deviation(npc, enemy:bone_position("bip01_spine"), weapon, distance)
+				look_pos = add_deviation(npc, enemy:bone_position("bip01_spine"), weapon, distance, enemy)
 				if bodystate == move.crouch then
-					look_pos = add_deviation(npc, enemy:bone_position("bip01_pelvis"), weapon, distance)
+					look_pos = add_deviation(npc, enemy:bone_position("bip01_pelvis"), weapon, distance, enemy)
 				end
 			end
 		elseif IsSniperRifle(weapon) then
@@ -3237,40 +3236,40 @@ function set_combat_sight(npc, enemy, weapon)
 		else
 			if distance < 25 then
 				if bodystate == move.crouch then
-					look_pos = add_deviation(npc, enemy:bone_position("bip01_pelvis"), weapon, distance)
+					look_pos = add_deviation(npc, enemy:bone_position("bip01_pelvis"), weapon, distance, enemy)
 				else
 					if enemy_pos.y < (npc_pos.y - 1) then
-						look_pos = add_deviation(npc, enemy:bone_position("bip01_head"), weapon, distance)
+						look_pos = add_deviation(npc, enemy:bone_position("bip01_head"), weapon, distance, enemy)
 					else
-						look_pos = add_deviation(npc, enemy:bone_position("bip01_neck"), weapon, distance)
+						look_pos = add_deviation(npc, enemy:bone_position("bip01_neck"), weapon, distance, enemy)
 					end
 				end
 			elseif distance >= 25 and distance < 50 then
 				if bodystate == move.crouch then
-					look_pos = add_deviation(npc, enemy:bone_position("bip01_pelvis"), weapon, distance)
+					look_pos = add_deviation(npc, enemy:bone_position("bip01_pelvis"), weapon, distance, enemy)
 				else
-					look_pos = add_deviation(npc, enemy:bone_position("bip01_head"), weapon, distance)
+					look_pos = add_deviation(npc, enemy:bone_position("bip01_head"), weapon, distance, enemy)
 				end
 			else	
-				look_pos = add_deviation(npc, enemy:bone_position("bip01_head"), weapon, distance)
+				look_pos = add_deviation(npc, enemy:bone_position("bip01_head"), weapon, distance, enemy)
 			end
 		end
 	else	
 		if is_armor(enemy) then
 			if string.find(enemy:name(),"btr") then
-				look_pos = add_deviation(npc, enemy:bone_position("seat_left"), weapon, distance)
+				look_pos = add_deviation(npc, enemy:bone_position("seat_left"), weapon, distance, enemy)
 			else
-				look_pos = add_deviation(npc, enemy:bone_position("pilot1"), weapon, distance)
+				look_pos = add_deviation(npc, enemy:bone_position("pilot1"), weapon, distance, enemy)
 			end
 		else
 			if IsSniperRifle(weapon) then
 				if enemy_pos.y < (npc_pos.y - 1) then
-					look_pos = add_deviation(npc, enemy:bone_position("bip01_head"), weapon, distance)
+					look_pos = add_deviation(npc, enemy:bone_position("bip01_head"), weapon, distance, enemy)
 				else
-					look_pos = add_deviation(npc, enemy:bone_position("bip01_neck"), weapon, distance)
+					look_pos = add_deviation(npc, enemy:bone_position("bip01_neck"), weapon, distance, enemy)
 				end
 			else
-				look_pos = add_deviation(npc, enemy:bone_position("bip01_spine"), weapon, distance)
+				look_pos = add_deviation(npc, enemy:bone_position("bip01_spine"), weapon, distance, enemy)
 			end
 		end
 	end
@@ -3476,12 +3475,14 @@ function select_position(npc, target, flag)
 		return npc:level_vertex_id()
 	end
 	
-	local act_item = npc:item_in_slot(npc:active_slot())
+	local a_sl = npc:active_slot()
+
 	local bw = nil
-	if not act_item then
+	if a_sl == 4294967295 or not npc:item_in_slot(a_sl) then
 		local wm = rx_wmgr and rx_wmgr.get_wm(npc)
-		bw = (wm and wm:get_weapon()) or npc:best_weapon()
+		bw = (wm and wm:get_weapon()) or npc:best_weapon()		
 	else
+		local act_item = npc:item_in_slot(a_sl)
 		bw = act_item
 	end
 	
@@ -3838,7 +3839,7 @@ function check_for_grenades(npc)
 						if ogse.get_npc_relation(npc,best_danger:object())=="enemy" then
 							enable_object(npc, best_danger:object())
 							process_enemy(npc, best_danger:object())
-							npc:make_object_visible_somewhen(best_danger:object())
+							-- npc:make_object_visible_somewhen(best_danger:object())
 							xr_sound.set_sound(npc, "beware_grenade")
 						end
 					end
@@ -3947,12 +3948,10 @@ function correct_position(gi,npc)
 end
 
 function process_restrictions(npc)
+	if restrictions_off then return end
+
 	local name = npc:name()
 	local profile = npc:profile_name()
-	
-	if restrictions_off then
-		return
-	end
 	
 	if string.find(name, "sniper") or string.find(profile, "sniper")
 	or string.find(name, "watch") or string.find(profile, "watch")
@@ -4000,13 +3999,10 @@ function clean_restrictions(str_restr)
 end
 
 function restore_restrictions(npc)
+	if restrictions_off then return end	
 
 	local name = npc:name()
 	local profile = npc:profile_name()
-	
-	if restrictions_off then
-		return
-	end	
 
 	if string.find(name, "sniper") or string.find(profile, "sniper")
 	or string.find(name, "watch") or string.find(profile, "watch")

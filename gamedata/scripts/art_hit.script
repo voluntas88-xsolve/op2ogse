@@ -4,7 +4,14 @@
 -- основные работы и доведение до ума и рабочего сосотояни -> Charsi
 
 function attach( sm )
-  sm:subscribe({ signal = "on_take", fun = this.hit_by_art })
+  sm:subscribe({ signal = "on_first_update", fun = this.on_first_update })
+end
+
+
+function on_first_update()
+  ogse_signals.get_mgr():subscribe({
+    signal = "on_take", fun = this.hit_by_art
+  })
 end
 
 
@@ -121,7 +128,6 @@ local particles = {
 
 
 function hit_by_art( obj )
-  if device().precache_frame > 1 then return end
   if has_alife_info( "biznes_remove_special_item" ) then return end
   local rec = db.artefacts[ obj:id() ]
   if not rec then return end
@@ -138,6 +144,7 @@ function hit_by_art( obj )
     dsh.timeout( 3000, function()
       set_actor_power_max( 1 )
     end )
+    dsh_monster_attack.run_snd_vol_timer( 0.1 )
   end
   play_particles()
   local p, i, t = unpack( parse_names( s ) )

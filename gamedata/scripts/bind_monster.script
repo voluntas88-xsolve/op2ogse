@@ -104,23 +104,19 @@ end
 
 
 function generic_object_binder:subscribe_updaters()
-  -- выполнять по одному за апдейт
-  local s_name = "on_monster_update." .. self.object:id()
   if self.object:alive() then
     self.updaters = {
       {
-        [ "signal" ] = s_name,
+        [ "signal" ] = "on_monster_update." .. self.object:id(),
         [ "self"   ] = self,
-        [ "fun"    ] = self.check_blowout,
-        [ "queued" ] = true,
+        [ "fun"    ] = self.check_blowout_and_logic_update,
       },
     }
     if self:defend_hospital_need() then
       table.insert( self.updaters, {
-        [ "signal" ] = s_name,
+        [ "signal" ] = "on_update",
         [ "self"   ] = self,
         [ "fun"    ] = self.defend_hospital,
-        [ "queued" ] = true,
       })
     end
   else
@@ -166,8 +162,8 @@ end
 -- Akill квест на защиту госпиталя
 
 
-function generic_object_binder:check_blowout()
-  self.am:reschedule( 1000 )
+function generic_object_binder:check_blowout_and_logic_update()
+  self.am:reschedule( math.random( 1000, 2000 ) )
   local blowout = amk.load_variable( "blowout", 0 )
   if blowout == 3 and ( not self.control_override ) then
     if not self.object:action() then
@@ -175,6 +171,7 @@ function generic_object_binder:check_blowout()
       xr_logic.mob_capture( self.object, true )
       self.control_override = true
     end
+    self.am:reschedule( 1000 )
   elseif self.control_override and blowout == 3 then
     if not self.object:action() then
       local snds = { sound.take_damage, sound.panic, sound.idle }
@@ -186,6 +183,7 @@ function generic_object_binder:check_blowout()
         cond( cond.sound_end )
       )
     end
+    self.am:reschedule( 1000 )
   elseif self.control_override and blowout ~= 3 then
     -- отпускаем зверушку
     self.control_override = nil
@@ -194,6 +192,7 @@ function generic_object_binder:check_blowout()
     xr_logic.issue_event(
       self.object, self.st[ self.st.active_scheme ], "update", delta
     )
+    self.am:reschedule( 100 )
   end
 end
 
@@ -252,7 +251,7 @@ function generic_object_binder:death_callback( victim, who )
   end
   self.updaters = {}
 
-  self.am:call( "on_monster_death", victim, who )
+  self.am:call( "on_monster_death", self.object, who )
   event( "monster_death" ):trigger({ victim = self.object, who = who })
 end
 
@@ -277,7 +276,7 @@ function generic_object_binder:update( delta )
   self.am:call(
     "on_monster_update." .. self.object:id(), self.object, delta
   )
-  event( "monster_update" ):trigger({ obj = self.object })
+  -- event( "monster_update" ):trigger({ obj = self.object })
 end
 
 
@@ -424,7 +423,12 @@ function generic_object_binder:net_destroy()
     db.del_monster( self.object ) -- убираем из онлайн-живых
   end
 
-  self.am:call( "on_monster_net_destroy", self.object )
+  for _, s in ipairs( self.updaters ) do
+    self.am:unsubscribe( s )
+  end
+  self.updaters = {}
+
+  self.am:call( "on_monster_net_destroy", self.object, self )
   self.am:cleanup_signal_subs( "on_monster_update." .. self.object:id() )
   event( "monster_net_destroy" ):trigger({ victim = self.object })
   object_binder.net_destroy(self)
@@ -433,10 +437,13 @@ function generic_object_binder:net_destroy()
   local id   = self.object:id()
   local sobj = alife():object( id )
   if sobj and IsMonster( sobj ) then
-    local tbl = amk.read_monster_params( sobj )
-    if table.getn( tbl.crvu32u16u2 ) > 0 then
-      tbl.crvu32u16u2 = {}
-      amk.write_monster_params( tbl, sobj )
+    local pk = get_netpk( sobj, 1 )
+    if pk:isOk() then
+      local data = pk:get()
+      if table.getn( data.dynamic_in_restrictions ) > 0 then
+        data.dynamic_in_restrictions = {}
+        pk:set( data )
+      end
     end
   end
 end
@@ -452,20 +459,19 @@ function generic_object_binder:net_save_relevant()
 end
 
 
-local saving_obj
 function generic_object_binder:save( packet )
   ASSERT(
-    saving_obj == nil ,
+    db.saving_obj == nil ,
     "found saving_obj = %s",
-    tostring( saving_obj and saving_obj:name() or nil )
+    tostring( db.saving_obj and db.saving_obj:name() or nil )
   )
-  saving_obj = self.object
+  db.saving_obj = self.object
   object_binder.save( self, packet )
   xr_logic.save_obj( self.object, packet )
   if self.object:clsid() == clsid.script_trader then
     trade_manager.save( self.object, packet )
   end
-  saving_obj = nil
+  db.saving_obj = nil
 end
 
 
@@ -543,10 +549,15 @@ end
 
 
 function generic_object_binder:enemy_callback( obj, enemy_st )
+  if not obj:alive() then return false end
   local valid, enemy = validate_enemy_object( enemy_st )
   if valid then
     local result = {}
-    self.am:call( "on_monster_enemy_callback", obj, enemy, result )
+    if enemy:alive() then
+      self.am:call( "on_monster_enemy_callback", obj, enemy, result )
+    else
+      table.insert( result, false )
+    end
     for _, v in ipairs( result ) do
       if not v then
         obj:enable_memory_object( enemy, false )

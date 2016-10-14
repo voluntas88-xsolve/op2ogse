@@ -9,10 +9,9 @@
 -----------------------------------------------------------------------
 function attach(sm)
 	sm:subscribe({signal = "on_spawn", fun = this.on_spawn})
---[[	sm:subscribe({signal = "on_use", fun = this.on_item_use})
-	sm:subscribe({signal = "on_update", fun = this.on_update})
-	sm:subscribe({signal = "on_save", fun = this.on_save})
-]]
+--	sm:subscribe({signal = "on_use", fun = this.on_item_use})
+--	sm:subscribe({signal = "on_update", fun = this.on_update})
+--	sm:subscribe({signal = "on_save", fun = this.on_save})
 end
 --auto_attach = true
 --[[
@@ -106,7 +105,7 @@ function begin_sleep(desired_sleep_time)
 		-- при необходимости расширить список!
     		amk.check_timers()
 		ogse_signals.get_mgr():call("on_update", 0)
-		event("actor_update"):trigger({delta = 0})
+		-- event("actor_update"):trigger({delta = 0})
 		-- ogse_actor_conditions_mgr.on_update()
 
 		-- проверяем останов по разным событиям

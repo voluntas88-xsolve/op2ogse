@@ -32,9 +32,9 @@
 ; ammo_9x39_ap                      3.5
 ; ammo_9x39_izomorf                      8.33
 ;
-; ammo_12x76_dart        5.0
-; ammo_12x76_zhekan     18.0
-; ammo_zhekan_izomorf   23.0
+; ammo_12x76_dart       20.0
+; ammo_12x76_zhekan     20.0
+; ammo_zhekan_izomorf   25.0
 ;
 ; ammo_7.62x51_fmj      2.0
 ; ammo_7.62x51_ap             2.5
@@ -77,6 +77,7 @@
 #include "w_p90.ltx"
 #include "w_ppsh41_sk2.ltx"
 #include "w_bizon.ltx"
+#include "w_bizon_op2.ltx"
 #include "w_bizon1.ltx"
 #include "w_kriss_super_v.ltx"
 #include "w_mp7.ltx"
@@ -88,6 +89,7 @@
 #include "w_toz34h.ltx"
 #include "w_bm16.ltx"
 #include "w_spas12.ltx"
+#include "w_spas12_op2.ltx"
 #include "w_wincheaster1300.ltx"
 #include "w_saiga12c.ltx"
 #include "w_m4super90.ltx"
@@ -112,6 +114,8 @@
 #include "w_9a91.ltx"
 #include "w_g3.ltx"
 #include "w_vihr.ltx"
+#include "w_scar.ltx"
+#include "w_akm.ltx"
 ;;;;;;;;;;;;;;;;;;;      Винтовки         ;;;;;;;;;;;;;;;;;;;;
 #include "w_svd.ltx"
 #include "w_svu.ltx"
@@ -124,6 +128,7 @@
 #include "w_vintorez.ltx"
 #include "w_vintorez_m1.ltx"
 #include "w_gauss.ltx"
+#include "w_gauss_op2.ltx"
 #include "w_gauss_krayzis.ltx"
 #include "w_val.ltx"
 #include "w_flame.ltx"
@@ -1353,7 +1358,7 @@ visual                  = weapons\ammo\ammo_12x76_dart.ogf
 description				= enc_weapons1_ammo_ammo-12x76-dart
 $prefetch 		= 64
 
-cost					 = 620 ;100
+cost					 = 1240 ;620 ;100
 
 box_size		= 10
 
@@ -1368,7 +1373,7 @@ inv_grid_y			= 10
 
 k_dist			= 2.5
 k_disp			= 1 ;1.2
-k_hit			= 5.0
+k_hit			= 20 ;5.0
 k_impulse		= 1 ;1.2
 k_pierce		= 1.55
 impair			= 1 ;1.2
@@ -1414,7 +1419,7 @@ inv_grid_y			= 10
 
 k_dist			= 1.25
 k_disp			= 2.0 ;2.8
-k_hit			= 18.0 ;5.6
+k_hit			= 20.0 ;18.0 ;5.6
 k_impulse		= 1 ;1.8
 k_pierce		= 1 ;1.27
 impair			= 1 ;1.15
@@ -1450,7 +1455,7 @@ inv_grid_height		= 1
 inv_grid_x			= 25
 inv_grid_y			= 50
 
-k_hit			= 23.0 ;9.6
+k_hit			= 25.0 ;23.0 ;9.6
 impair			= 2
 explosive		     = on
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1489,12 +1494,12 @@ inv_grid_x			= 13
 inv_grid_y			= 9
 
 k_dist			= 1.0
-k_disp			= 5
-k_hit			= 0.85
+k_disp			= 18 ;5
+k_hit			= 0.425 ;0.85
 k_impulse		= 1 ;0.8
 k_pierce		= 1 ;1.25
-impair			= 2 ;3
-buck_shot		= 16
+impair			= 1 ;2 ;3
+buck_shot		= 32 ;16
 tracer			= off
 wm_size         = 0.05
 tracer_color_ID		= 1
@@ -1527,12 +1532,12 @@ inv_grid_x		= 46
 inv_grid_y		= 49
 
 k_dist			= 1.0
-k_disp			= 3 ;6.5
-k_hit			= 1.2
+k_disp			= 8 ;3 ;6.5
+k_hit			= 1.8 ;1.2
 k_impulse		= 1 ;0.7
 k_pierce		= 1 ;1.29
-impair			= 2 ;1.2
-buck_shot		= 12
+impair			= 1 ;2 ;1.2
+buck_shot		= 8 ;12
 tracer			= off
 wm_size			= 0.06
 explosive		= off
@@ -3607,4 +3612,29 @@ cost				= 45000
 nightvision_sect = effector_nightvision_bast
 pnv_discharge_hours = 8
 
-;------------------------------end------------------------------------------
+
+[wpn_addon_1p78]:identity_immunities,scope.2_8x
+GroupControlSection	= spawn_group
+discovery_dependency = 
+$spawn			= "weapons\addons\scope" ; option for Level Editor
+class			= WP_SCOPE
+cform           = skeleton
+visual          	= weapons\upgrade\upg_scope_1p78.ogf
+$prefetch 		= 32
+description		= enc_1p78_desc
+cost			= 1200
+
+holder_range_modifier	= 1.2
+holder_fov_modifier		= 0.3
+
+inv_name		= enc_1p78
+inv_name_short	= enc_1p78
+inv_weight		= .7
+
+inv_grid_width     	= 1
+inv_grid_height    	= 1
+inv_grid_x			= 80
+inv_grid_y			= 79
+
+scope_texture		= wpn\wpn_crosshair_1p78
+belt = true

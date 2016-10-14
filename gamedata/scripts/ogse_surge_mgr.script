@@ -6,7 +6,6 @@
 -------------------------------------------------------------------------------
 
 function attach(sm) -- для менеджера сигналов
-	sm:subscribe({signal = "on_update",          fun = this.on_actor_update})
 	sm:subscribe({signal = "on_first_update",    fun = this.on_first_update})
 	sm:subscribe({signal = "on_info",            fun = this.on_get_info})
 	sm:subscribe({signal = "on_spawn",           fun = this.on_actor_spawn})
@@ -233,9 +232,12 @@ function set_info_preblow_to_blow()
 	db.actor:give_info_portion("pre_blowout2")
 end
 
+
 function set_info_blow()
-	db.actor:give_info_portion("blowout")
+  db.actor:give_info_portion( "blowout" )
+  run_blowout_timer()
 end
+
 
 function set_no_net_signal()
 	db.actor:give_info_portion("no_net_signal")
@@ -300,11 +302,12 @@ function surge_db_init()
 	}
 	surge_db.surge_process_stage_04 = {-- первые визуальные признаки выброса
 		on_info = {
-			call1 = amk_anoms.pre_blow_off, -- нужно делать без вариантов незаависимо от подземки
-                        call2 = amk_anoms.cleanup_arts,
-                        call3 = dsh.blowout_modif_arts,
-                        call4 = dsh_rukzak.blowout_modif_arts,
-                        call5 = function()
+			call1 = ogse_anomaly_evader.pre_blow_off,
+			call2 = amk_anoms.pre_blow_off, -- нужно делать без вариантов незаависимо от подземки
+                        call3 = amk_anoms.cleanup_arts,
+                        call4 = dsh.blowout_modif_arts,
+                        call5 = dsh_rukzak.blowout_modif_arts,
+                        call6 = function()
                           db.actor.blowout_outside = true
                         end,
 			if_surface = {Flag2 = 1,},
@@ -321,7 +324,8 @@ function surge_db_init()
 			},
 		},
 		on_reinit = {
-			call1 = amk_anoms.pre_blow_off, -- Поднимаем флаги выброса для локаций
+			call1 = ogse_anomaly_evader.pre_blow_off,
+			call2 = amk_anoms.pre_blow_off, -- Поднимаем флаги выброса для локаций
 			if_surface = {Flag2 = 1},
 			if_underground = {Flag2 = 0},
 		},
@@ -601,8 +605,10 @@ function on_surge_end()
 		archievements.acv_count_event("acv_blow", 5, "Выброшенный")
 		db.actor.blowout_outside = nil
 	end
-	dsh.spawn_all_respawners()
-	amk.start_timer("autosave_blowout", 10, "") -- autosave
+	dsh.spawn_dsh_respawners()
+	dsh.timeout( 10000, function()
+	  autosave_blowout()
+	end )
         ogse.save_var(
           script_name() .. ".blowout_count",
           ogse.load_var( script_name() .. ".blowout_count", 0 ) + 1,
@@ -613,6 +619,18 @@ function on_surge_end()
 	ogse_yan_random_quest.reinit_item_list() -- получаем новый список предметов у Сахарова (Mixser)
 ]]	
 end
+
+
+function autosave_blowout()
+  if u3_utils.can_save() then
+    u3_utils.savegame_date( "Выброс" )
+  else
+    dsh.timeout( 3000, function()
+      autosave_blowout()
+    end )
+  end
+end
+
 
 function surge_final()
 	db.actor:disable_info_portion("pre_blowout")
@@ -711,43 +729,72 @@ end
 -- 30			"surge_process_stage_14"	ogse_surge_20	завершение выброса
 -- 10			"surge_process_stage_15"	ogse_surge_21	финализация, вороны
 
-local deferred_actions = nil -- запрос на выполнение отложенных действий
+
+local deferred_actions -- запрос на выполнение отложенных действий
+
 -- делаем что-то для обновления текущего состояния
-function on_actor_update()
-	if deferred_actions then
-		local info_action = deferred_actions.on_info_deferred
-		if info_action then
-			parse_and_process_surge_stage(info_action)
-		end
-		deferred_actions = nil
-	end
-	if db.actor:has_info("blowout") then
-		if ogse_hideouts.npc_inside_safe_zone(db.actor)
-		or amk_mod.outfit_hideout()
-		then
-			db.FlagEsc = 1
-		else	
-			db.FlagEsc = 0
-		end	
-		if db.Dead2 == 1 and db.FlagEsc == 0 then
-			g_R_Vibros:Run()
---			hit_actor()
-			play_sounds()
-			level.add_pp_effector("dead_zone.ppe", 1003, true)
-			-- level.add_pp_effector("radiation.ppe", 1003, true)
-			level.set_pp_effector_factor(1003, 0.5)
-		end
-		if db.FlagEsc == 1 then
-			g_R_Vibros:Stop()
-		end
-	else
-		if db.FlagEsc == 1 then
-			db.FlagEsc = 0
-			db.Dead2 = 0
-			g_R_Vibros:Stop()
-		end
-	end
+local blowout_t
+function run_blowout_timer()
+  if not blowout_t then
+    blowout_t = check_blowout_timer():start()
+  end
 end
+
+class "check_blowout_timer" ( ogse_qt.quick_timer )
+function check_blowout_timer:__init() super()
+end
+
+function check_blowout_timer:condition()
+  return not ( deferred_actions or db.actor:has_info( "blowout" ) )
+end
+
+function check_blowout_timer:action()
+  blowout_t = nil
+end
+
+function check_blowout_timer:update()
+  ogse_signals.get_mgr():reschedule( 1000 )
+  on_actor_update()
+end
+
+
+function on_actor_update()
+  if deferred_actions then
+    local info_action = deferred_actions.on_info_deferred
+    if info_action then
+      parse_and_process_surge_stage( info_action )
+    end
+    deferred_actions = nil
+  end
+  if db.actor:has_info( "blowout" ) then
+    if
+      ogse_hideouts.npc_inside_safe_zone( db.actor )
+      or amk_mod.outfit_hideout()
+    then
+      db.FlagEsc = 1
+    else	
+      db.FlagEsc = 0
+    end	
+    if db.Dead2 == 1 and db.FlagEsc == 0 then
+      g_R_Vibros:Run()
+      -- hit_actor()
+      play_sounds()
+      level.add_pp_effector( "dead_zone.ppe", 1003, true )
+      level.set_pp_effector_factor( 1003, 0.5 )
+    end
+    if db.FlagEsc == 1 then
+      g_R_Vibros:Stop()
+    end
+  else
+    if db.FlagEsc == 1 then
+      db.FlagEsc = 0
+      db.Dead2   = 0
+      g_R_Vibros:Stop()
+    end
+  end
+end
+
+
 -- выполняем реинициализацию фазы выброса при перезагрузке
 function on_first_update() -- выполняем восстановление временных эффектов, флагов и т.п.
 	if db.actor:has_info("pre_blowout") then
@@ -759,7 +806,8 @@ function on_first_update() -- выполняем восстановление временных эффектов, флаго
 				if info_action then
 					parse_and_process_surge_stage(info_action)
 				end
-				deferred_actions = stage_actions		
+				deferred_actions = stage_actions
+				run_blowout_timer()
 				break
 			end
 		end
@@ -772,6 +820,7 @@ function on_get_info(npc, info_id)
 	if action_item then
 		surge_log("surge stage: %s", tostring(info_id))
 		deferred_actions = action_item -- запрашиваем выполнение отложенных действий
+		run_blowout_timer()
 		local info_action = action_item.on_info
 		if info_action then
 			log1("!!SURGE_DEBUG: info["..tostring(info_id).."]")

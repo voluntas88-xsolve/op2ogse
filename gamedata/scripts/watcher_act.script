@@ -183,26 +183,24 @@ function do_not_touch( item )
 end
 
 
-function cannot_take_that(npc)
-	if npc then
-		if protected_items.is_no_offline_alife_npc( npc:section() ) or
-		   npc:character_community()=="zombied" or
-		   npc:character_community()=="trader" or 
-		   npc:character_community()=="arena_enemy" or 
-		   npc:character_community()=="quest_stalker" or 
---[[
-		   string.find(npc:name(), "doctor") or 
-		   string.find(npc:name(), "doktor") or		   
-		   string.find(npc:name(), "mil_stalker") or 
-		   string.find(npc:name(), "ecolog") or 
-		   string.find(npc:name(), "specnaz") or 
-		   string.find(npc:name(), "scientist") or
-]]
-		   string.find(npc:name(), "mil_freedom_member0021") then return true else return false 
-		end		
-	end
-	return false
+function cannot_take_that( npc )
+  if npc then
+    if
+      protected_items.is_no_offline_alife_npc( npc:section() )
+      or ogse.is_quest_npc( npc )
+      or npc:character_community() == "zombied"
+      or npc:character_community() == "trader"
+      or npc:character_community() == "arena_enemy"
+      or npc:character_community() == "quest_stalker"
+      or npc:name() == "mil_freedom_member0021"
+      or string.find( npc:name(), "pri_followers", 1, true )
+    then
+      return true
+    end
+  end
+  return false
 end
+
 
 function max_weight(npc)
 	local total_weight = 0.0
@@ -599,10 +597,14 @@ function ev_see_stuff:evaluate()
 	end
 	local res = getGObject(self.st) ~= nil
 	local npc = self.object
-	local actsch = db.storage[npc:id()].active_scheme
-	if actsch and db.actor then
-		xr_logic.try_switch_to_another_section(npc, db.storage[npc:id()][actsch], db.actor)
-	end
+	-- naxac: Это здесь вообще ни к чему, т.к. секции логики для данной
+	-- схемы значения не имеют, она работает всегда. Этот вызов может
+	-- порождать баги наподобии повторного включения одной и той же схемы,
+	-- и, как следствие, зависание логики и самого объекта.
+	-- local actsch = db.storage[npc:id()].active_scheme
+	-- if actsch and db.actor then
+	-- 	xr_logic.try_switch_to_another_section(npc, db.storage[npc:id()][actsch], db.actor)
+	-- end
 	local act_sec = db.storage[npc:id()].active_section or ""
 	if bad_situation(npc) then
 		if res then

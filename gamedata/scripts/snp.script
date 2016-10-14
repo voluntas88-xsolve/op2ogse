@@ -160,13 +160,6 @@ function checking_taken_item_snp(obj)
 			db.actor:give_info_portion("krest_topor_done")
 		end
 
-	elseif section == "ammo_gravi" then
-		alife():release(alife():object(obj:id()))
-
-	elseif section == "letter" then
-		alife():release(alife():object(obj:id()))
-		archievements.acv_count_event("acv_ptln", 30, "Почтальон") 
-
 	elseif string.find(section,"fli_code") then
 		if not has_alife_info("teleport_started") then
 			se_obj = string.sub(section,9)
@@ -502,7 +495,6 @@ function check_treasure(box)
 	elseif section == "n_inventory_box_x162" then
 		db.actor:give_info_portion("snpt_x161_done")
 		db.actor:give_info_portion("snp_video_arhiv_done")
-		archievements.acv_task()
 		
 	elseif section == "n_inventory_box_yantar1" then
 		x16_17()
@@ -1826,7 +1818,6 @@ function create_wounded(section,pos,lv,gv,sid)
 end
 
 function invul_on()
-	inventory.get_free_belt_slot()
 	amk.spawn_item_in_inv("af_invul", db.actor)
 end
 function invul_off()

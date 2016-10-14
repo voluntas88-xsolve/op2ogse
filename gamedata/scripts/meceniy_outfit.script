@@ -4,9 +4,51 @@
 --и С возможностью апгрейда..Меченый(Стрелок)..
 
 function attach( sm )
-  sm:subscribe({ signal = "on_spawn",  fun = this.on_spawn        })
-  sm:subscribe({ signal = "on_update", fun = this.on_actor_update })
-  sm:subscribe({ signal = "on_use",    fun = this.on_item_use     })
+  sm:subscribe({ signal = "on_drop",         fun = this.remove_outfit   })
+  sm:subscribe({ signal = "on_item_to_ruck", fun = this.remove_outfit   })
+  sm:subscribe({ signal = "on_item_to_slot", fun = this.use_outfit      })
+  sm:subscribe({ signal = "on_spawn",        fun = this.on_spawn        })
+  sm:subscribe({ signal = "on_use",          fun = this.on_item_use     })
+end
+
+
+function use_outfit( obj )
+  if string.find( obj:section(), "exo_mil_exoskeleton_add", 1, true ) then
+    subscribe()
+  end
+end
+
+
+function remove_outfit( obj )
+  if string.find( obj:section(), "exo_mil_exoskeleton_add", 1, true ) then
+    local outfit = db.actor:get_current_outfit()
+    if
+      outfit
+      and string.find( outfit:section(), "exo_mil_exoskeleton_add", 1, true )
+    then
+      return
+    end
+    unsubscribe()
+  end
+end
+
+
+local signals
+function subscribe()
+  if not signals then
+    signals = {
+      signal = "on_update", fun = this.on_actor_update,
+      script_name = script_name(),
+    }
+    ogse_signals.get_mgr():subscribe( signals )
+  end
+end
+
+function unsubscribe()
+  if signals then
+    ogse_signals.get_mgr():unsubscribe( signals )
+    signals = nil
+  end
 end
 
 
@@ -31,9 +73,6 @@ function save_cfg()
 end
 
 
-local t_upd    = 0
-local is_pleer = false
-
 local con_skat_1 = 1
 local con_skat_2 = 1
 local con_skat_3 = 1
@@ -50,17 +89,15 @@ local lim_radiation  = 0
 
 
 function on_actor_update()
-  if t_upd > time_global() then return end
+  ogse_signals.get_mgr():reschedule( 1000 )
   local outfit = db.actor:get_current_outfit()
-  if not is_pleer then
-    player_ogg.start_pleer_post_save()
-    is_pleer = true
-  end
 
   if
-    not outfit
-    or not string.find( outfit:section(), "^exo_mil_exoskeleton_add" )
-    or not db.actor:alive()
+    ( not outfit )
+    or (
+      not string.find( outfit:section(), "exo_mil_exoskeleton_add", 1, true )
+    )
+    or ( not db.actor:alive() )
   then
     return
   end
@@ -89,7 +126,7 @@ function on_actor_update()
   lim_bleed      = 0.5 + diff
   lim_power      = 0.4 - diff
   lim_radiation  = 0.2 + diff
-  if cfg.enabled then
+  if cfg.enabled and dsh_weight_control.get_power_mode() then
     system_outfit()
     if     outfit:section() == "exo_mil_exoskeleton_addr"  then
       new_system_rad()
@@ -99,7 +136,6 @@ function on_actor_update()
       new_anti_dot()
     end
   end
-  t_upd = time_global() + 1000
 end
 
 
@@ -255,7 +291,10 @@ end
 function new_anti_dot()
   if not cfg.health then return end
   if db.actor.psy_health >= lim_psy_health then return end
-  if db.actor:object( "antizombie" ) then
+  if
+    ( not dsh_medkit.restoring( "psy_health_restore_speed" ) )
+    and db.actor:object( "antizombie" )
+  then
     eat_item( "antizombie" )
   end
 end
@@ -264,7 +303,10 @@ end
 function new_system_power()
   if not cfg.power then return end
   if db.actor.power > lim_power then return end
-  if db.actor:object( "energy_drink" ) then
+  if
+    ( not dsh_medkit.restoring( "power_restore_speed" ) )
+    and db.actor:object( "energy_drink" )
+  then
     eat_item( "energy_drink" )
   end
 end

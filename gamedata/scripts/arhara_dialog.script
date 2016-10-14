@@ -1,4 +1,117 @@
 -- -*- mode: lua; coding: windows-1251-dos -*-
+
+function attach( sm )
+  sm:subscribe({ signal = "on_first_update", fun = this.on_first_update })
+end
+
+
+function on_first_update()
+  local items = {
+    [ "amul_naemn"   ] = this.checking_taken_item48,
+    [ "amulet"       ] = this.checking_taken_item44,
+    -- [ "bullion_gild" ] = this.checking_taken_item50,
+    [ "streyndzher"  ] = this.checking_taken_item58,
+  }
+  for sect, fun in pairs( items ) do
+    local obj = db.actor:object( sect )
+    if obj then
+      fun( obj )
+      break
+    end
+  end
+end
+
+
+-- отобрать все, что нельзя проносить в МГ
+function oruzhie_delet()
+  local remove_sects = {}
+  local remove_items = dsh_rukzak.get_actor_items(
+    function( obj )
+      if
+        obj:is_scope()
+        or obj:section() == "meceniy_outfit_new"
+        or obj:section() == "hand_teleporter"
+        or obj:section() == "teleportator"
+        or spawn_level_changer.teleports[ obj:section() ]
+        or ( obj:is_weapon() and get_u32( obj:section(), "slot", 0 ) == 2 )
+        or (
+          obj:is_weapon_magazined()
+          and (
+            ogse_wpn_utils.get_scope_status( obj ) == 1
+            or (
+              ogse_wpn_utils.get_scope_status( obj ) == 2
+              and ogse_wpn_utils.get_scope_flag( obj )
+            )
+          )
+          and not (
+            obj:section() == "wpn_binoc"
+            or obj:section() == "wpn_fot"
+          )
+        )
+      then
+        remove_sects[ obj:section() ] = true
+        return true
+      end
+      return false
+    end
+  )
+  if table.getn( remove_items ) > 0 then
+    for _, ai in ipairs( remove_items ) do
+      if not ai.count then
+        ai.count = table.getn( ai.game_objs )
+      end
+      for _, obj in ipairs( ai.game_objs ) do
+        ogse.remove_item_from_inventory( obj )
+      end
+    end
+    local new = alife():create(
+      get_string( "treasure_item", "real_item_section" ),
+      db.actor:position(), db.actor:level_vertex_id(), db.actor:game_vertex_id()
+    )
+    dsh_rukzak.save_rukzak( new.id, remove_items )
+    ogse.save_var( "dsh_rukzak." .. new.id .. ".inv_drop", true )
+    ogse.save_var( "dsh_rukzak." .. new.id .. ".zamok",    true )
+    for sect, _ in pairs( remove_sects ) do
+      news_manager.relocate_item( db.actor, "out", sect )
+    end
+  end
+end
+
+
+function bunker_fotik_artu_sms_delayed()
+  ogse_st_mgr.start_timer(
+    script_name() .. ".bunker_fotik_artu_sms",
+    10, script_name() .. ".bunker_fotik_artu_sms"
+  )
+end
+
+function bunker_fotik_artu_sms()
+  laba_del_artu()
+  laba_spir()
+  news_manager.send_tip(
+    db.actor,
+    "%c[255,160,160,160]" .. "СООБЩЕНИЕ СИСТЕМЫ:" .. "\\n"
+    .. "%c[255,255,128,128]Под действием неизвестного компонента часть артефактов в рюкзаке может подвергнуться трансмутации в артефакт Спираль." .. "" .. "\n",
+    nil, nil, 25000, nil,
+    [[characters_voice\human_03\stalker\talk\labux\labux_17]]
+  )
+  ogse_st_mgr.start_timer(
+    script_name() .. ".bunker_fotik_artu_sms1",
+    10, script_name() .. ".bunker_fotik_artu_sms1"
+  )
+end
+
+function bunker_fotik_artu_sms1()
+  news_manager.send_tip(
+    db.actor,
+    "%c[255,160,160,160]" .. "СТРЕЛОК:" .. "\\n"
+    .. "%c[255,255,128,128]Ну дела... Только бы не абсолюты, только не абсолюты... а Клёнов говорил, что Спираль - единственная ошибка эксперимента..." .. "" .. "\n",
+    nil, nil, 20000, nil,
+    [[characters_voice\human_03\stalker\talk\labux\labux_45]]
+  )
+end
+
+
 local math_random = math.random
 
 --' спавним рацию Волка на свалке (функция Сяка перестала работать)
@@ -495,15 +608,28 @@ function akim_kubik_nayti_done(first_speaker, second_speaker)
  sak.out_item_namber("kubik",1)
 end
 
+
 --' спавним книгу Шахтёра
 function book_xabarych_spawn()
-local obj = alife():create("book_xabarych",vector():set(-218.918,0.026,-223.327),14359,2882)
+  dsh.create_and_map_treasure(
+    "Книга Шахтёра",
+    "Шахтёр сказал, что где-то здесь, в давние времена, много людей расстреляли. Книга на месте их гибели должна быть.",
+    "book_xabarych",
+    vector():set( -218.918, 0.026, -223.327 ),
+    14359, 2882
+  )
 end
+
 
 --' проверим наличие книги
 function shax_kniga_naity_have() 
-return sak.have_item_namber("book_xabarych",1) ~= false
+  local res = sak.have_item_namber( "book_xabarych", 1 ) ~= false
+  if res then
+    dsh.map_remove_treasure_inv( "book_xabarych" )
   end
+  return res
+end
+
 
 --' отдадим книгу шахтёру и получим  микроб и Ремингтон 
 function shax_kniga_naity_done(first_speaker, second_speaker)
@@ -984,29 +1110,27 @@ new_dialog.item_much("old_doc_3_2",1) ~= false and
 new_dialog.item_much("old_doc_3_1",1) ~= false
 end
 
+
 --' проверим наличие 4 документов для Акима и броников
 function have_a_doc_q()
-return new_dialog.item_much("militaryspec_outfit",1) ~= false and
-new_dialog.item_much("exo_outfit",1) ~= false and
-new_dialog.item_much("dolg_scientific_outfit",1) ~= false and
-new_dialog.item_much("exo_bandit_outfit",1) ~= false and
-new_dialog.item_much("old_doc_4",1) ~= false and
-new_dialog.item_much("pda_info",1) ~= false
+  return new_dialog.item_much( "gagarin_outfit_m1", 1 ) ~= false
+    and new_dialog.item_much( "old_doc_4", 1 ) ~= false
+    and new_dialog.item_much( "pda_info",  1 ) ~= false
 end
 
+
 --' отдадим всё Акиму и получим  награду
-function out_outfit(first_speaker, second_speaker)
-sak.out_item_namber("militaryspec_outfit",1)
-sak.out_item_namber("exo_outfit",1)
-sak.out_item_namber("dolg_scientific_outfit",1)
-sak.out_item_namber("old_doc_4",1)
-sak.out_item_namber("pda_info",1)
-sak.out_item_namber("exo_bandit_outfit",1)
-dialogs.relocate_money(second_speaker, 8000, "in")
-dialogs.relocate_item_section(first_speaker, "arhara_instruk", "in")
-db.actor:give_info_portion("2")
-db.actor:change_character_reputation(10)
+function out_outfit( first_speaker, second_speaker )
+  sak.out_item_namber( "gagarin_outfit_m1", 1 )
+  sak.out_item_namber( "old_doc_4", 1 )
+  sak.out_item_namber( "pda_info",  1 )
+  dialogs.relocate_money( second_speaker, 8000, "in" )
+  dialogs.relocate_item_section( first_speaker, "arhara_instruk", "in" )
+  db.actor:give_info_portion( "2" )
+  db.actor:change_character_reputation( 10 )
 end
+
+
 -- Akill begin Изменены к-ты спавна доков + монстры
 --' спавним 4 документ для Акима
 function spawn_new_dok()
@@ -1117,8 +1241,8 @@ end
 
 --' получим  сыворотку от Калинина
 function kalinin_zadan_done(first_speaker, second_speaker) 
-dialogs.relocate_item_section(second_speaker, "suvorotka","in")
-dialogs.relocate_item_section(second_speaker, "suvorotka","in")
+dialogs.relocate_item_section(second_speaker, "medkit_scientic","in")
+dialogs.relocate_item_section(second_speaker, "medkit_scientic","in")
 end
 
 --' проверим наличие флэхи для Калинина
@@ -1555,7 +1679,7 @@ end
 end
 
 
-function checking_taken_item45(obj)
+function checking_taken_item45( obj )
   if obj:section() == "kluch_dell_teleport" then
     dsh.map_remove_treasure_inv( "kluch_dell_teleport" )
     delete_teleport_baza_vxod(obj)
@@ -1596,7 +1720,6 @@ end
 
 
 function checking_taken_item47( obj )
-  if device().precache_frame > 0 then return end
   if obj:section() == "kluch_dell_teleport2" then
     sms_otkl_teleport( obj )
   end
@@ -3518,21 +3641,64 @@ end
 function spezdetektor_sms()
 news_manager.send_tip(db.actor, "%c[255,160,160,160]".."ПОЛУЧЕНА ИНФОРМАЦИЯ:".."\\n".."%c[255,255,128,128]Вы находитесь в зоне, содержащей специфическую пластмассу.".."".."\n", nil, nil, 15000, nil, [[characters_voice\human_03\stalker\talk\labux\labux_8]])
 end
+
+
 function pda_slom_sms1()
-news_manager.send_tip(db.actor, "%c[255,160,160,160]".."СООБЩЕНИЕ СИСТЕМЫ:".."\\n".."%c[255,255,128,128]Навигационный модуль вашего КПК вышел из строя. Отображение на дисплее карты и индикаторов временно невозможно.".."".."\n", nil, "nano", 15000, nil, [[characters_voice\human_03\stalker\talk\labux\labux_9]])
+  news_manager.send_tip(
+    db.actor,
+    "%c[255,160,160,160]" .. "СООБЩЕНИЕ СИСТЕМЫ:" .. "\\n"
+    .. "%c[255,255,128,128]Навигационный модуль вашего КПК вышел из строя. Отображение на дисплее карты и индикаторов временно невозможно." .. "" .. "\n",
+    nil, "nano", 15000, nil,
+   [[characters_voice\human_03\stalker\talk\labux\labux_9]]
+  )
+  dsh_broken_pda.on_spawn()
 end
+
+
 function pda_slom_sms2()
-news_manager.send_tip(db.actor, "%c[255,160,160,160]".."МЕЧЕНЫЙ:".."\\n".."%c[255,255,128,128]Вот блин... Как не вовремя...".."".."\n", nil, nil, 10000, nil, [[characters_voice\human_03\stalker\talk\labux\labux_83]])
+  news_manager.send_tip(
+    db.actor,
+    "%c[255,160,160,160]" .. "МЕЧЕНЫЙ:" .. "\\n"
+    .. "%c[255,255,128,128]Вот блин, как всегда... Всё не вовремя..." .. "" .. "\n",
+    nil, nil, 10000, nil,
+    [[characters_voice\human_03\stalker\talk\labux\labux_83]]
+  )
 end
+
+
 function pda_slom_sms3()
-news_manager.send_tip(db.actor, "%c[255,160,160,160]".."МЕЧЕНЫЙ:".."\\n".."%c[255,255,128,128]Бармен, привет. Выручай - навигация на ПДА грохнула... Без локальной карты никак...".."".."\n", nil, nil, 20000, nil, [[characters_voice\human_03\stalker\talk\labux\labux_80]])
+  news_manager.send_tip(
+    db.actor,
+    "%c[255,160,160,160]" .. "МЕЧЕНЫЙ:" .. "\\n"
+    .. "%c[255,255,128,128]Бармен, привет. Выручай - навигация на ПДА грохнула... Без локальной карты никак..." .. "" .. "\n",
+    nil, nil, 20000, nil,
+    [[characters_voice\human_03\stalker\talk\labux\labux_80]]
+  )
 end
+
+
 function pda_slom_sms4()
-news_manager.send_tip(db.actor, "%c[255,160,160,160]".."БАРМЕН:".."\\n".."%c[255,255,128,128]Я перетёр с Доцентом. Будешь в Баре - зайди к нему - посмотрит, что с твоим ПДА. За небольшую сумму. Хе-хе...".."".."\n", nil, nil, 20000, nil, [[characters_voice\human_03\stalker\talk\labux\labux_10]])
+  news_manager.send_tip(
+    db.actor,
+    "%c[255,160,160,160]" .. "БАРМЕН:" .. "\\n"
+    .. "%c[255,255,128,128]Я перетёр с Доцентом. Будешь в Баре - зайди к нему - посмотрит, что с твоим ПДА. За небольшую сумму. Хе-хе..." .. "" .. "\n",
+    nil, nil, 20000, nil,
+    [[characters_voice\human_03\stalker\talk\labux\labux_10]]
+  )
 end
+
+
 function pda_slom_sms5()
-news_manager.send_tip(db.actor, "%c[255,160,160,160]".."МЕЧЕНЫЙ:".."\\n".."%c[255,255,128,128]Вот жопа... Придётся идти к Доценту в Бар. Ещё и замок на рюкзаке чинить придётся - заклинил, гад, с трудом можно ствол второй достать... Ладно, всё равно по-пути.".."".."\n", nil, nil, 25000, nil, [[characters_voice\human_03\stalker\talk\labux\labux_81]])
+  news_manager.send_tip(
+    db.actor,
+    "%c[255,160,160,160]" .. "МЕЧЕНЫЙ:" .. "\\n"
+    .. "%c[255,255,128,128]Вот жопа... Придётся идти к Доценту в Бар." .. "" .. "\n",
+    nil, nil, 25000, nil,
+    [[characters_voice\human_03\stalker\talk\labux\labux_81]]
+  )
 end
+
+
 function pda_slom_sms6()
 news_manager.send_tip(db.actor, "%c[255,160,160,160]".."СООБЩЕНИЕ СИСТЕМЫ:".."\\n".."%c[255,255,128,128]Навигационный модуль вашего КПК может неадекватно отображать координаты на некоторых территориях.".."".."\n", nil, "nano", 20000, nil, [[characters_voice\human_03\stalker\talk\labux\labux_11]])
 end
@@ -3637,12 +3803,6 @@ news_manager.send_tip(db.actor, "%c[255,160,160,160]".."СТРЕЛОК:".."\\n".."%c[25
 end
 function pozisiy_bunker_gg_sms1()
 news_manager.send_tip(db.actor, "%c[255,160,160,160]".."КЛЫК:".."\\n".."%c[255,255,128,128]Отлично. Надеюсь, ты в маскхалате... Жди гостей, они уже в бункере, следи за входом в зал. Иду следом. Это не монолитовцы... Там есть нейтрал - с рацией - его надо взять живьём, иначе мы не узнаем ничего, кроме того, что есть в тайнике. Запомни - его убивать нельзя, даже после открытия двери тайника.".."".."\n", nil, nil, 30000, nil, [[characters_voice\human_03\stalker\talk\labux\labux_103]])
-end
-function bunker_fotik_artu_sms()
-news_manager.send_tip(db.actor, "%c[255,160,160,160]".."СООБЩЕНИЕ СИСТЕМЫ:".."\\n".."%c[255,255,128,128]Под действием неизвестного компонента часть артефактов в рюкзаке может подвергнуться трансмутации в артефакт Спираль.".."".."\n", nil, nil, 25000, nil, [[characters_voice\human_03\stalker\talk\labux\labux_17]])
-end
-function bunker_fotik_artu_sms1()
-news_manager.send_tip(db.actor, "%c[255,160,160,160]".."СТРЕЛОК:".."\\n".."%c[255,255,128,128]Ну дела... Только бы не абсолюты, только не абсолюты... а Клёнов говорил, что Спираль - единственная ошибка эксперимента...".."".."\n", nil, nil, 20000, nil, [[characters_voice\human_03\stalker\talk\labux\labux_45]])
 end
 function ozhivil_radista_sms()
 news_manager.send_tip(db.actor, "%c[255,160,160,160]".."КЛЫК:".."\\n".."%c[255,255,128,128]Стрелок, тут такие дела... Была у меня заначка - Живое сердце - слышал о таком, наверно. Взял грех на душу - оживил радиста... Пусть живёт, может поразговорчивей будет...".."".."\n", nil, nil, 25000, nil, [[characters_voice\human_03\stalker\talk\labux\labux_104]])
@@ -4055,15 +4215,17 @@ function otkr_perex_zaton_sms2()
     .. "%c[255,255,128,128]Эй, мужики! Я с вами! Нечего мне тут больше делать." .. "" .. "\n",
     nil, nil, 15000
   )
-  amk.start_timer( "run", 7, "arhara_dialog.acv_sol()" )
-  amk.start_timer( "run2", 7, "oksana_spawn.akim_panic()" )
+  ogse_st_mgr.start_timer( nil, 7, "arhara_dialog.acv_sol"   )
+  ogse_st_mgr.start_timer( nil, 7, "oksana_spawn.akim_panic" )
   dsh.black_doc_exo_start_sms_delayed()
 end
 
 
 function acv_sol()
-db.actor:give_info_portion("acv_sol")
+  db.actor:give_info_portion( "acv_sol" )
 end
+
+
 function nashel_listok_sms1()
 news_manager.send_tip(db.actor, "%c[255,160,160,160]".."СТРЕЛОК:".."\\n".."%c[255,255,128,128]Похоже, я нашёл записку... Владимир Ильич умеет хранить тайны...".."".."\n", nil, nil, 20000, nil, [[characters_voice\ozvuchka\strelok_dcity2]])
 end
@@ -4293,26 +4455,31 @@ local se_obj = alife():object("village_pantera")
   end
 end
 
+
 --' убираем мобильного торгаша с Агры
 function delete_agro_mobil_torgash()
-	local se_obj = alife():object("agro_mobil_torgash")
-	if se_obj then
-		-- сначала прерываем диалог
-		local obj = level.object_by_id(se_obj.id)
-		if obj and obj:is_talking() then
-			obj:stop_talk()
-			db.actor:stop_talk()
-		end
-		-- затем удаляем
-		amk.start_timer("run", 0.2, "arhara_dialog.delete_agro_mobil_torgash2()")
-	end
-end
-function delete_agro_mobil_torgash2()
-local se_obj = alife():object("agro_mobil_torgash")
+  local se_obj = alife():object( "agro_mobil_torgash" )
   if se_obj then
-    alife():release(se_obj, true)
+    -- сначала прерываем диалог
+    local obj = level.object_by_id( se_obj.id )
+    if obj and obj:is_talking() then
+      obj:stop_talk()
+      db.actor:stop_talk()
+    end
+    -- затем удаляем
+    ogse_st_mgr.start_timer(
+      nil, 0.2, "arhara_dialog.delete_agro_mobil_torgash2"
+    )
   end
 end
+
+function delete_agro_mobil_torgash2()
+  local se_obj = alife():object( "agro_mobil_torgash" )
+  if se_obj then
+    alife():release( se_obj, true )
+  end
+end
+
 
 --' спавним пси-антенну на Кордоне
 function x_ray_antenna_spawn(first_speaker, second_speaker)
@@ -5419,26 +5586,29 @@ function af_kamen_est()
 return sak.have_item_namber("af_kamen_udachy",1) ~= false
   end
 
---' убираем Седого с атп 
+
+--' убираем Седого с атп
 function atp_sedoy_dell()
-	local se_obj = alife():object("atp_mobil_torgovetz")
-	if se_obj then
-		-- сначала прерываем диалог
-		local obj = level.object_by_id(se_obj.id)
-		if obj and obj:is_talking() then
-			obj:stop_talk()
-			db.actor:stop_talk()
-		end
-		-- затем удаляем
-		amk.start_timer("run", 0.2, "arhara_dialog.atp_sedoy_dell2()")
-	end
-end
-function atp_sedoy_dell2()
-local se_obj = alife():object("atp_mobil_torgovetz")
+  local se_obj = alife():object( "atp_mobil_torgovetz" )
   if se_obj then
-    alife():release(se_obj, true)
+    -- сначала прерываем диалог
+    local obj = level.object_by_id( se_obj.id )
+    if obj and obj:is_talking() then
+      obj:stop_talk()
+      db.actor:stop_talk()
+    end
+    -- затем удаляем
+    ogse_st_mgr.start_timer( nil, 0.2, "arhara_dialog.atp_sedoy_dell2" )
   end
 end
+
+function atp_sedoy_dell2()
+  local se_obj = alife():object( "atp_mobil_torgovetz" )
+  if se_obj then
+    alife():release( se_obj, true )
+  end
+end
+
 
 --' убираем вертуху Седого с атп
 function atp_sedoy_heli_dell()
@@ -5803,15 +5973,15 @@ function laba_del_artu()
             if aCount >= 1 then 
                 sak.out_item_namber(a, 1)
                 laba_v_spiral_virogdeno_count = laba_v_spiral_virogdeno_count + 1
+		break
             end
         end
     end
 end
 --' получим спиральки
 function laba_spir(first_speaker, second_speaker) 
-    for i=1,laba_v_spiral_virogdeno_count,1 do
-        dialogs.relocate_item_section(second_speaker, "af_spiral","in")
-    end
+  local sobj = ogse.spawn_item_in_inv( "af_spiral" )
+  news_manager.relocate_item( db.actor, "in", sobj:section_name() )
 end
 ------------------------------------------------------------------------------------------------------------------
 local tabl_forest_v_izom = { 
@@ -5873,32 +6043,7 @@ function mozg_plastilin_est(first_speaker, second_speaker)
         dialogs.relocate_item_section(second_speaker, "izomorf_plastilin","in")
     end
 end
-------------------------------------------------------------------------------------------------------------------
-local tabl_otnimem_oruzhie = { 
-    ["wpn_vintorez"] = 1, ["wpn_val_voron"] = 1, ["wpn_scar_mk17"] = 1, ["wpn_scar_snip"] = 1, ["wpn_scar_792"] = 1, ["wpn_akm_m3"] = 1, ["wpn_vepr545"] = 1, ["wpn_mp153"] = 1, ["wpn_mp153pract"] = 1, ["wpn_scar_mk16"] = 1, ["wpn_sl8"] = 1, ["wpn_hawk"] = 1, ["wpn_hk417_camo"] = 1, ["wpn_sayga_al"] = 1, ["wpn_vintorez_m1"] = 1, ["wpn_20w_vintorez"] = 1, ["wpn_vintorez_ves"] = 1, ["wpn_svd"] = 1, ["wpn_svd_ves"] = 1, ["wpn_svd_m1"] = 1, ["wpn_svd_m2"] = 1, ["wpn_svd_m3"] = 1, ["wpn_svu"] = 1, ["wpn_vihlop_m1"] = 1, ["wpn_svu_m1"] = 1,["wpn_svu_ves"] = 1, ["wpn_lr300"] = 1, ["wpn_lr300_m1"] = 1, ["wpn_lr300_kalibr"] = 1, ["wpn_lr300_otdaca"] = 1, ["wpn_lr300_kalibr_ves"] = 1, ["wpn_lr300_otdaca_ves"] = 1, ["wpn_lr300_ves"] = 1,["wpn_famas_p3_sk1"] = 1, ["wpn_famas_p3_sk1_kalibr"] = 1, ["wpn_famas_p3_sk1_otdaca"] = 1, ["wpn_famas_p3_sk1_kalibr_ves"] = 1,    ["wpn_famas_p3_sk1_otdaca_ves"] = 1, ["wpn_famas_p3_sk1_ves"] = 1, ["wpn_l85"] = 1, ["wpn_l85_m1"] = 1,  ["wpn_l85_m2"] = 1, ["wpn_l85_kalibr"] = 1, ["wpn_l85_otdaca"] = 1, ["wpn_l85_kalibr_ves"] = 1,   ["wpn_l85_otdaca_ves"] = 1,["wpn_l85_ves"] = 1, ["wpn_ak103"] = 1, ["wpn_sig_m1"] = 1, ["wpn_sig_m2"] = 1, ["wpn_sig550"] = 1, ["wpn_sig550_kalibr"] = 1, ["wpn_sig550_otdaca"] = 1, ["wpn_sig550_kalibr_ves"] = 1, ["wpn_sig550_otdaca_ves"] = 1, ["wpn_sig550_ves"] = 1, ["wpn_sg552_sk1"] = 1, ["wpn_sg552_sk1_kalibr"] = 1, ["wpn_sg552_sk1_otdaca"] = 1, ["wpn_sg552_sk1_kalibr_ves"] = 1, ["wpn_sg552_sk1_otdaca_ves"] = 1, ["wpn_sg552_sk1_ves"] = 1, ["wpn_awm"] = 1, ["wpn_awm_ves"] = 1, ["wpn_m16a2_sk1"] = 1, ["wpn_m16a2_sk12"] = 1, ["wpn_m16a2_sk1_kalibr"] = 1, ["wpn_m16a2_sk1_otdaca"] = 1,["wpn_m16a2_sk1_kalibr_ves"] = 1, ["wpn_m16a2_sk1_otdaca_ves"] = 1, ["wpn_m16a2_sk1_ves"] = 1, ["wpn_hk417_sk1"] = 1,    ["wpn_hk417_sk1_otdaca"] = 1, ["wpn_hk417_sk1_otdaca_ves"] = 1, ["wpn_hk417_sk1_ves"] = 1, ["wpn_sr25_mk11_mod0_sk1"] = 1, ["wpn_sr25_mk11_mod0_sk1_otdaca"] = 1, ["wpn_sr25_mk11_mod0_sk1_otdaca_ves"] = 1,    ["wpn_sr25_mk11_mod0_sk1_ves"] = 1, ["wpn_ak105"] = 1, ["wpn_zastava_m77"] = 1, ["wpn_vihlop_m1"] = 1, ["wpn_zastava_m76"] = 1, ["wpn_gauss"] = 1, ["wpn_gauss_krayzis"] = 1, ["wpn_val"] = 1, ["wpn_val_m1"] = 1, ["wpn_val_m2"] = 1, ["wpn_val_ves"] = 1, ["wpn_ak74"] = 1, ["wpn_ak74_kalibr"] = 1, ["wpn_ak74_otdaca"] = 1, ["wpn_ak74_kalibr_ves"] = 1, ["wpn_ak74_otdaca_ves"] = 1, ["wpn_ak74_ves"] = 1, ["wpn_awm_ves"] = 1, ["wpn_ak47"] = 1, ["wpn_ak47_otdaca"] = 1, ["wpn_ak47_otdaca_ves"] = 1, ["wpn_ak47_ves"] = 1, ["wpn_fn2000"] = 1, ["wpn_fn2000_old"] = 1, ["wpn_fn2000_kalibr"] = 1, ["wpn_fn2000_otdaca"] = 1, ["wpn_fn2000_kalibr_ves"] = 1, ["wpn_fn2000_otdaca_ves"] = 1, ["wpn_fn2000_ves"] = 1, ["wpn_abakan"] = 1, ["wpn_abakan_m1"] = 1, ["wpn_abakan_m2"] = 1, ["wpn_abakan_kalibr"] = 1, ["wpn_abakan_otdaca"] = 1, ["wpn_abakan_kalibr_ves"] = 1, ["wpn_abakan_otdaca_ves"] = 1, ["wpn_abakan_ves"] = 1, ["wpn_groza"] = 1, ["wpn_groza_m1"] = 1, ["wpn_groza_m2"] = 1, ["wpn_groza_m3"] = 1, ["wpn_groza_ves"] = 1, ["wpn_mg42"] = 1, ["wpn_xm8_para_sk2"] = 1, ["wpn_m_134"] = 1, ["wpn_m134"] = 1, ["wpn_m4"] = 1, ["wpn_m4_kalibr"] = 1, ["wpn_m4_kalibr_ves"] = 1, ["wpn_m4_otdaca"] = 1, ["wpn_m4_otdaca_ves"] = 1, ["wpn_m4_ves"] = 1, ["wpn_pkm"] = 1, ["wpn_pkm_ves"] = 1, ["wpn_akm_ves_otdaca"] = 1, ["wpn_akms"] = 1, ["wpn_akms_m1"] = 1, ["wpn_aks74"] = 1,  ["wpn_aks74_kalibr_ves_otdaca"] = 1, ["wpn_g36c"] = 1, ["wpn_fn_fal_c1"] = 1, ["wpn_g36"] = 1, ["wpn_g36_kalibr"] = 1, ["wpn_g36_otdaca"] = 1, ["wpn_g36_kalibr_ves"] = 1, ["wpn_g36_otdaca_ves"] = 1, ["wpn_g36_ves"] = 1, ["wpn_g36_m1"] = 1, ["wpn_toz34"] = 1, ["wpn_wpn_toz34_ves"] = 1, ["wpn_protecta"] = 1, ["wpn_protecta_ves"] = 1, ["wpn_m4super90"] = 1, ["wpn_m4super90_ves"] = 1, ["wpn_saiga12c"] = 1,["wpn_saiga12c_ves"] = 1, ["wpn_rg-6"] = 1, ["wpn_rg6_m1"] = 1, ["wpn_walther_wa2000"] = 1, ["wpn_b94"] = 1, ["wpn_b94_ves"] = 1, ["wpn_ak74_m1"] = 1, ["wpn_aks74m"] = 1, ["wpn_aks74m_kalibr"] = 1, ["wpn_aks74m_otdaca"] = 1, ["wpn_aks74m_kalibr_ves"] = 1, ["wpn_aks74m_otdaca_ves"] = 1, ["wpn_aks74m_ves"] = 1, ["wpn_gravigun"] = 1, ["wpn_dark_gauss"] = 1, ["wpn_gauss2b"] = 1, ["wpn_bizon"] = 1, ["wpn_bizon1"] = 1, ["wpn_ak47_sk1"] = 1, ["wpn_ak104"] = 1, ["wpn_ak203"] = 1, ["wpn_akm203_pso"] = 1, ["wpn_aug_a1"] = 1, ["wpn_aug_a2"] = 1, ["wpn_fn2000_paratrooper"] = 1, ["wpn_ognemet"] = 1, ["wpn_rem870_magnum"] = 1, ["wpn_sayga12k"] = 1, ["wpn_vihlop"] = 1, ["wpn_b94_sil"] = 1, ["wpn_vsk94"] = 1, ["wpn_oicw"] = 1, ["wpn_sbr"] = 1, ["wpn_acr"] = 1, ["wpn_ak74u_svd"] = 1, ["wpn_awp"] = 1, ["wpn_awp_m1"] = 1, ["wpn_aa12_m1"] = 1, ["wpn_ak74_m3"] = 1, ["wpn_ak104t"] = 1, ["wpn_aks47"] = 1, ["wpn_aks74_m2"] = 1, ["wpn_hostel"] = 1, ["wpn_cz550"] = 1, ["wpn_m4_m1"] = 1, ["wpn_mkb_42"] = 1, ["wpn_akm_sk2"] = 1, ["wpn_kord"] = 1, ["wpn_kord_m1"] = 1, ["wpn_mossberg590"] = 1, ["wpn_rpk47_sk1"] = 1, ["wpn_rpk74_sk1"] = 1, ["wpn_stg44"] = 1, ["wpn_peceneg"] = 1, ["wpn_ak9"] = 1, ["wpn_sayga12_sk1"] = 1, ["wpn_browningauto5"] = 1, ["wpn_vepr12_m1"] = 1, ["wpn_vepr12_col"] = 1, ["wpn_vepr12_20"] = 1, ["wpn_vepr"] = 1, ["wpn_sg550_sr"] = 1, ["wpn_aa12"] = 1, ["wpn_protecta_col"] = 1, ["wpn_ak47_md"] = 1, ["wpn_ak47_sh"] = 1, ["wpn_ak74_m2"] = 1, ["wpn_ak108"] = 1, ["wpn_ak107"] = 1, ["wpn_ak107_m1"] = 1, ["wpn_ak109"] = 1, ["wpn_ak12"] = 1, ["wpn_aek973"] = 1, ["wpn_akms_m2"] = 1, ["wpn_akm_m1"] = 1, ["wpn_vepr12"] = 1, ["wpn_g3_otdaca_ves"] = 1, ["wpn_aek973_otdaca_ves"] = 1, ["wpn_akms_otdaca_ves"] = 1, ["wpn_ognemet_m1"] = 1, ["wpn_gauss_ves"] = 1, ["wpn_sr3t"] = 1, ["wpn_usas12"] = 1, ["wpn_sayga_un"] = 1, ["wpn_m500_custom"] = 1, ["wpn_m4_a3"] = 1, ["wpn_m249"] = 1, ["wpn_g3"] = 1, ["wpn_g3sg1"] = 1, ["wpn_g41"] = 1, ["wpn_rpk47_bub"] = 1, ["wpn_rpk47_m1"] = 1, ["wpn_scar_cry"] = 1, ["wpn_hk53_a3"] = 1, ["wpn_sks_s"] = 1, ["wpn_vint14"] = 1, ["wpn_m4a1"] = 1, ["wpn_hk416"] = 1, ["wpn_groza_sn"] = 1, ["wpn_shmel"] = 1, ["wpn_m16a2"] = 1, ["wpn_rpkm40"] = 1, ["wpn_rpkcstmcol"] = 1, ["wpn_rpkcustom"] = 1, ["wpn_sig552camo"] = 1, ["wpn_sks_cust"] = 1, ["wpn_benelli_m3"] = 1, ["wpn_benelli_m3_tactik"] = 1, ["wpn_v94"] = 1, ["wpn_ksvk"] = 1, ["wpn_rpg7"] = 1, ["meceniy_outfit_new"] = 1, ["arhara_tele"] = 1, ["device_teleport"] = 1, ["hand_teleporter"] = 1, ["wpn_addon_acog"] = 1, ["wpn_addon_scope_pks07"] = 1, ["wpn_addon_scope"] = 1, ["wpn_addon_pu_scope"] = 1       
- }
-local otnimem_oruzhie_virogdeno_count = 0 -- количество отнятых стволов
 
-function oruzhie_delet()
-    otnimem_oruzhie_virogdeno_count = 0
-    for a,v in pairs(tabl_otnimem_oruzhie) do
-        --если вероятность вырождения "сработала"
-        if math_random() < v then
-            --а сколько у ГГ стволов то ?
-            aCount = 0
-            db.actor:iterate_inventory(function (dummy, vItem)
-                if vItem:section() == a then
-                    aCount = aCount + 1 
-                end 
-            end, nil)
-            if aCount >= 1 then 
-                sak.out_item_namber(a, 10)
-                otnimem_oruzhie_virogdeno_count = otnimem_oruzhie_virogdeno_count + 1
-            end
-        end
-    end
-end
-------------------------------------------------------------------------------------------------------------------
 
 --' заспавним БПБ в гроте
 function bpb_spawn()
@@ -5939,11 +6084,11 @@ end
 function disabl_karta(actor, npc)
     --db.actor:hide_weapon()
     --level.disable_input()
-    level.hide_indicators()
+    --level.hide_indicators()
     --printf("xr_effects <disable_ui>")
 end
 function enabl_karta(actor, npc)
-    level.show_indicators()
+    --level.show_indicators()
     --level.enable_input()
     --db.actor:restore_weapon()
     --printf("xr_effects <enable_ui>")
@@ -6333,12 +6478,22 @@ function take_psewdofoto_pili(first_speaker, second_speaker)
 dialogs.relocate_item_section(second_speaker, "psewdofoto","in")
 end
 
+
 function spawn_bunker_sekret()
-local obj = alife():create("mulyz_bomba",vector():set(8.089,-23.447,14.072),7800,2773)
-local obj = alife():create("mulyz_bomba",vector():set(7.608,-23.439,13.871),7695,2773)
-local obj = alife():create("osnova_fotik",vector():set(7.210,-23.435,14.039),7695,2773)
-local obj = alife():create("neizv_zapiska",vector():set(6.511,-23.436,14.206),7431,2773)
+  alife():create(
+    "mulyz_bomba", vector():set( 8.089, -23.447, 14.072 ), 7800, 2773
+  )
+  alife():create(
+    "mulyz_bomba", vector():set( 7.608, -23.439, 13.871 ), 7695, 2773
+  )
+  alife():create(
+    "osnova_fotik", vector():set( 7.608, -22.439, 13.871 ), 7695, 2773
+  )
+  alife():create(
+    "neizv_zapiska", vector():set( 7.608, -22.439, 13.871 ), 7695, 2773
+  )
 end
+
 
 --' удаляем рестриктор оживления радиста
 function del_ozh_radista_restr(story_id)

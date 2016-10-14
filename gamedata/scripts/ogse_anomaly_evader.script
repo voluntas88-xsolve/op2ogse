@@ -41,10 +41,10 @@ local last_position      = {}
 function attach( sm )
   sm:subscribe({ signal = "on_after_blowout",       fun = this.on_after_blowout })
   sm:subscribe({ signal = "on_monster_death",       fun = this.on_death   })
-  sm:subscribe({ signal = "on_monster_net_destroy", fun = this.on_destroy })
+  sm:subscribe({ signal = "on_monster_net_destroy", fun = this.on_death   })
   sm:subscribe({ signal = "on_monster_spawn", fun = this.on_monster_spawn })
   sm:subscribe({ signal = "on_npc_death",           fun = this.on_death   })
-  sm:subscribe({ signal = "on_npc_net_destroy",     fun = this.on_destroy })
+  sm:subscribe({ signal = "on_npc_net_destroy",     fun = this.on_death   })
   sm:subscribe({ signal = "on_npc_spawn",     fun = this.on_npc_spawn     })
   sm:subscribe({ signal = "on_spawn", fun = this.on_spawn })
   sm:subscribe({ signal = "on_save",  fun = this.on_save  })
@@ -58,8 +58,10 @@ function on_monster_spawn( obj, binder )
   if excluded_npc[ obj:story_id() ] then return end
   if excluded_locations[ level.name() ] then return end
   local s = {
-    [ "signal" ] = "on_monster_update." .. obj:id(),
+    [ "signal" ] = "on_update",
+    [ "self"   ] = obj,
     [ "fun"    ] = this.update_norm,
+    [ "script_name" ] = script_name(),
   }
   binder[ script_name() .. ".subscribed" ] = s
   ogse_signals.get_mgr():subscribe( s )
@@ -80,8 +82,10 @@ function on_npc_spawn( obj, binder )
   end
   if excluded_locations[ level.name() ] then return end
   local s = {
-    [ "signal" ] = "on_npc_update." .. obj:id(),
+    [ "signal" ] = "on_update",
+    [ "self"   ] = obj,
     [ "fun"    ] = this.update_norm,
+    [ "script_name" ] = script_name(),
   }
   binder[ script_name() .. ".subscribed" ] = s
   ogse_signals.get_mgr():subscribe( s )
@@ -93,45 +97,22 @@ function on_death( obj )
   local subscribed = binder[ script_name() .. ".subscribed" ]
   if subscribed then
     ogse_signals.get_mgr():unsubscribe( subscribed )
+    binder[ script_name() .. ".subscribed" ] = nil
   end
-  cleanup( obj )
-end
-
-
-function on_destroy( obj )
-  cleanup( obj )
+  -- cleanup( obj )
+  added_restrictions[ obj:id() ] = nil
+  last_position[ obj:id() ]      = nil
 end
 
 
 function remove_restriction( npc, anomid )
-  if npc and anomid and not isIndoor( level.name() ) then
-    local npc_id    = npc:id()
-    local obj       = level.object_by_id( anomid )
-    local anom_sect = ""
-    if obj then
-      anom_sect = obj:section()
-      if
-        ogse_anomaly.chek_exclusion_anomaly( anomid )
-        and not string.find( anom_sect, "handmade_" )
-      then
-        obj:disable_anomaly()
-      end
-    else
-      obj       = alife():object( anomid )
-      anom_sect = obj:section_name()
-    end
-    if
-      ogse_anomaly.chek_exclusion_anomaly( anomid )
-      and not string.find( anom_sect, "handmade_" )
-    then
-      ogse_anomaly.set_anomaly_mode( anomid, "del" )
-      ogse_anomaly.remove_anomaly( anomid )
-    end
-    if added_restrictions[ npc_id ]
-      and added_restrictions[ npc_id ][ anomid ]
-    then
-      added_restrictions[ npc_id ][ anomid ] = nil
-      npc:remove_restrictions( "", obj:name() )
+  local sobj = alife():object( anomid )
+  amk_anoms.set_anomaly_status( sobj, "del" )
+  for npc_id, anoms in pairs( added_restrictions ) do
+    local npc_obj = level.object_by_id( npc_id )
+    if npc_obj and anoms[ anomid ] then
+      anoms[ anomid ] = nil
+      npc_obj:remove_restrictions( "", sobj:name() )
     end
   end
 end
@@ -149,7 +130,9 @@ function cleanup( obj )
       end
     end
     if table.getn( restrs ) > 0 then
-        obj:remove_restrictions( "", table.concat( restrs, "," ) )
+      local s = table.concat( restrs, "," )
+      ASSERT( s:len() < 4096, "too long: %s", s:len() )
+      obj:remove_restrictions( "", s )
     end
     added_restrictions[ nid ] = nil
     last_position[ nid ]      = nil
@@ -161,12 +144,12 @@ end
 local freq = 1000
 
 function update_norm( obj )
-  ogse_signals.get_mgr():reschedule( freq )
+  ogse_signals.get_mgr():reschedule( freq + math.random( freq ) )
 
   local curr_pos = obj:position()
   local prev_pos = last_position[ obj:id() ]
   if prev_pos then
-    if prev_pos:distance_to( curr_pos ) < 15 then
+    if prev_pos:distance_to( curr_pos ) < 50 then
       return
     else
       last_position[ obj:id() ] = curr_pos
@@ -180,10 +163,10 @@ function update_norm( obj )
   end
 
   local restr = {}
-  for _, o in ipairs( amk_anoms.get_anomaly_list( obj, 30 ) ) do
-    local obj = level.object_by_id( o.id )
-    if obj and ogse_anomaly.get_anomaly_mode( o.id ) ~= "del" then
-      local sect_anom = obj:section()
+  for _, o in ipairs( amk_anoms.get_anomaly_list( obj, 100 ) ) do
+    local sobj = alife():object( o.id )
+    if sobj and amk_anoms.get_anomaly_status( sobj ) ~= "del" then
+      local sect_anom = sobj:section_name()
       local ignore    = false
       for k, v in pairs( excluded_sect ) do
         if string.find( sect_anom, k ) then
@@ -192,7 +175,7 @@ function update_norm( obj )
         end
       end
       if not ignore then
-        restr[ obj:name() ] = true
+        restr[ sobj:name() ] = true
       end
     end
   end
@@ -209,18 +192,22 @@ function update_norm( obj )
     for _, k in ipairs( del ) do
       added_restrictions[ obj:id() ][ k ] = nil
     end
-    obj:remove_restrictions( "", table.concat( del, "," ) )
+    local s = table.concat( del, "," )
+    ASSERT( s:len() < 4096, "too long: %s", s:len() )
+    obj:remove_restrictions( "", s )
   end
 
   local add = {}
   for k, _ in pairs( restr ) do
     if not should_npc_miss_this_anomaly( obj ) then
-      table.insert( add, k ) -- добавить новый
+      table.insert( add, k )
       added_restrictions[ obj:id() ][ k ] = true
     end
   end
   if table.getn( add ) > 0 then
-    obj:add_restrictions( "", table.concat( add, "," ) )
+    local s = table.concat( add, "," )
+    ASSERT( s:len() < 4096, "too long: %s", s:len() )
+    obj:add_restrictions( "", s )
   end
 end
 
@@ -256,6 +243,16 @@ function on_save()
   ogse.save_var(
     script_name() .. ".monster_miss_cnt", monster_miss_cnt, "u8"
   )
+end
+
+
+function pre_blow_off()
+  for id, _ in pairs( added_restrictions ) do
+    local obj = level.object_by_id( id )
+    if obj then
+      cleanup( obj )
+    end
+  end
 end
 
 

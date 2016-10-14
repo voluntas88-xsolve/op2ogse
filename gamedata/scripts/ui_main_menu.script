@@ -16,6 +16,7 @@ function main_menu:__init() super()
    self:InitCallBacks()
    self:InitGameSetupMenu()
 	get_console():execute("r2_sun_near_border 1")
+ 	dsh_cfg.on_before_main_menu()
 end
 
 function main_menu:__finalize()
@@ -108,6 +109,7 @@ end
 
 function main_menu:LoadLastSave()
 	ui_mm_opt_add.check_options()
+	dsh_cfg.on_after_main_menu()
 	
 	local					console = get_console()
 	console:execute			("main_menu off")
@@ -159,16 +161,17 @@ end
 function main_menu:OnMessageQuitWin()
 	archievements.save_gametime()
 	ui_mm_opt_add.check_options()
+	dsh_cfg.on_after_main_menu()
 	local console = get_console()
 	console:execute("quit")
 end
 
 function main_menu:OnButton_return_game()
 	ui_mm_opt_add.check_options()
-	ogse_rebind_key.unbind_key()
+	dsh_cfg.on_after_main_menu()
+	-- ogse_rebind_key.unbind_key()
 	ogse_night_vision.on_main_menu()
 	cmd("main_menu off")
-	archievements.mm_opt()
 	ui_mm_opt_add.buy_quest_item()
 	ogse_signals.get_mgr():call( "on_mm_return_game" )
 end
@@ -199,6 +202,7 @@ end
 
 function main_menu:StartGame()
 	ui_mm_opt_add.check_options()
+	dsh_cfg.on_after_main_menu()
 
 	local console = get_console()
 	
@@ -248,7 +252,7 @@ function main_menu:OnButton_options_clicked()
 		self.opt_dlg = ui_mm_opt_main.options_dialog()
 		self.opt_dlg.owner = self
 	end
-	ogse_rebind_key.rebind_key()
+	-- ogse_rebind_key.rebind_key()
 	self.opt_dlg:UpdateControls()
 	self:GetHolder():start_stop_menu(self.opt_dlg, true)
 	self:GetHolder():start_stop_menu(self, true) --new
@@ -297,11 +301,11 @@ end
 
 function main_menu:OnButton_save_level_clicked()
 	if level.present() and (db.actor ~= nil) and db.actor:alive() then
-		cmd("main_menu", "off")
 		ui_mm_opt_add.check_options()
+		dsh_cfg.on_after_main_menu()
 		get_console():execute("main_menu off")
 		u3_utils.savegame_on_level()
-		archievements.mm_opt()
+		ogse_signals.get_mgr():call( "on_mm_return_game" )
 	end
 end
 
@@ -361,10 +365,10 @@ function main_menu:OnKeyboard(dik, keyboard_action)  --virtual function
 		if dik == DIK_keys.DIK_ESCAPE then
 			if level.present() and (db.actor ~= nil) and db.actor:alive() then
 				ui_mm_opt_add.check_options()
+				dsh_cfg.on_after_main_menu()
 				ogse_night_vision.on_main_menu()
-				ogse_rebind_key.unbind_key()
+				-- ogse_rebind_key.unbind_key()
 				cmd("main_menu", "off")
-				archievements.mm_opt()
 				ui_mm_opt_add.buy_quest_item()
 				ogse_signals.get_mgr():call( "on_mm_return_game" )
 			end
@@ -377,10 +381,13 @@ function main_menu:OnKeyboard(dik, keyboard_action)  --virtual function
 
 		elseif dik == DIK_keys.DIK_F6 then
 			if level.present() and (db.actor ~= nil) and db.actor:alive() then
+				dsh_cfg.on_after_main_menu()
 				cmd("main_menu", "off")
+				ogse_signals.get_mgr():call( "on_mm_return_game" )
 			end
 		elseif dik == DIK_keys.DIK_F8 then
 			if level.present() and (db.actor ~= nil) and db.actor:alive() then
+				dsh_cfg.on_after_main_menu()
 				cmd("main_menu", "off")
 				device():pause(true)
 				cmd(string.format("save pqs_%s_%02d_%02d_%02d", 
@@ -389,6 +396,7 @@ function main_menu:OnKeyboard(dik, keyboard_action)  --virtual function
 					level.get_time_hours(),
 					level.get_time_minutes()))
 				device():pause(false)
+				ogse_signals.get_mgr():call( "on_mm_return_game" )
 			end
 		elseif dik == DIK_keys.DIK_S then
 			if level.present() and (db.actor ~= nil) and db.actor:alive() then
@@ -420,7 +428,9 @@ function main_menu:OnKeyboard(dik, keyboard_action)  --virtual function
 			elseif dik == DIK_keys.DIK_P then
 				if _sdata.GlobalEnable == false then
 					_sdata.GlobalEnable = true
+					dsh_sdata_proxy.subscribe()
 				else
+					dsh_sdata_proxy.unsubscribe()
 					_sdata.GlobalEnable = false
 					_sdata.switch_off()
 				end

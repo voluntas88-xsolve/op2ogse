@@ -1,5 +1,10 @@
 ; -*- mode: conf-windows; coding: windows-1251-dos -*-
 
+[dsh.gulag.idle.mil_monster]:dsh.gulag.idle
+; новые мутанты на Барьере появятся через промежуток времени от 3-х дней и
+; до недели
+monster = 72, 168
+
 ; Переопределить некоторые параметры гулагов.
 ;[dsh.gulag.override.mil_bandit]
 ; Наемники на АС, на хуторе около деревни кровососов
@@ -28,3 +33,17 @@ dsh_walking = true
 ; Лагерь свободовцев к Деревне Кровососов
 [dsh.gulag.override.mil_village]
 dsh_population_locked = true
+
+
+; Смарт для Кости на АС. Должен закрыться после выполнения всех заданий
+; Кости. См. dsh.se_stalker.esc_kostya.smart_terrains
+[dsh.gulag.override.as_lager]
+; cond = {+kostya_as_kamp}
+cond = { +kostya_as_kamp -kostya_pripyat_taynik_done }, { +kostya_as_kamp +akim_journal_start -kostya_journal_done }, { +kostya_as_kamp -voron_kostya_done }, { +kostya_as_kamp -kostya_biznes1_done }
+
+
+; Сталкеры на АС, под холмом, где Волк стоит.
+[dsh.gulag.override.mil_lager]
+communities = stalker, green
+dsh_walking = true
+dsh_walking_keep_min = 3

@@ -75,6 +75,22 @@ function on_first_update()
     this.fix_aem_admin,
     this.fix_news_check,
     this.fix_show_news,
+    this.fix_kotobegemot_bar,
+    this.fix_drop_boxes,
+    this.fix_running_treasure,
+    this.fix_jup_gun_3,
+    this.fix_letters,
+    this.fix_krest_topor,
+    this.fix_sleep_bags,
+    this.fix_bar_arena_triger,
+    this.fix_wpn_toz34_arena,
+    this.fix_explosive_barrel,
+    this.fix_tamaz_body2,
+    this.fix_gar_dm_novice,
+    this.fix_rebind_keys,
+    this.fix_podval_btr_nevid1,
+    this.fix_spawn_bunker_sekret,
+    this.fix_bunker_art_v_spiral_restrictor,
   }
   local version = ogse.load_var( vname, 0 )
   if version < table.getn( fixes ) then
@@ -133,6 +149,7 @@ function on_spawn()
   fix_mil_physic_object0034()
   fix_puzir_arhara_vagonchik()
   fix_bar_arena_man()
+  fix_val_door_nedostroyka()
 end
 
 
@@ -160,7 +177,7 @@ function free_smart_terrain( name, skip_npc )
   for id, v in pairs( strn.npc_info ) do
     local sobj = alife():object( id )
     if not skip_npc_keys[ sobj:name() ] then
-      local pk = xs_netpk.stalker( sobj )
+      local pk = get_netpk( sobj, 1 )
       if pk:isOk() then
         local data = pk:get()
         local cd   = data.custom_data:getTable()
@@ -484,7 +501,7 @@ function fix_nevid_monolit()
     local sid = sobj.m_story_id
     alife():release( sobj )
     sobj = alife():create( alife():spawn_id( sid ) )
-    pk = xs_netpk.stalker( sobj )
+    pk = get_netpk( sobj, 1 )
     if pk:isOk() then
       local data = pk:get()
       data.visual_name = "new\\supernevidimka_orig"
@@ -610,7 +627,7 @@ function fix_military_fotomuzhik()
   for _, n in ipairs( names ) do
     local sobj = alife():object( n )
     if sobj and sobj:alive() then
-      pk = xs_netpk.stalker( sobj )
+      pk = get_netpk( sobj, 1 )
       if pk:isOk() then
         local data = pk:get()
         data.visual_name = "new\\supernevidimka_orig"
@@ -657,7 +674,7 @@ function respawn_gavr_and_co()
           "dsh: found %s ( %s, %s )",
           sobj:name(), sobj:community(), object_level_name( sobj )
         )
-        local pk = xs_netpk.stalker( sobj )
+        local pk = get_netpk( sobj, 1 )
         if pk:isOk() then
           local data = pk:get()
           log2( "dsh: cd = %s", data.custom_data:getString() )
@@ -691,17 +708,6 @@ function remove_padar_spawn_zombi_kukla_restrictor()
       log2( "dsh: found %s", sobj:name() )
       alife():release( sobj )
     end
-  end
-end
-
-
-function fix_bandit_goodwill()
-  local goodwill = relation_registry.community_goodwill(
-    "bandit" , db.actor:id()
-  )
-  if goodwill < 0 then
-    log2( "dsh: fixing bandits goodwill: %s -> 0", goodwill )
-    relation_registry.set_community_goodwill( "bandit" , db.actor:id(), 0 )
   end
 end
 
@@ -989,7 +995,7 @@ function fix_foto_monolitovets()
     local sobj = alife():object( n )
     if sobj and sobj:alive() then
       log2( "dsh: found %s", sobj:name() )
-      pk = xs_netpk.stalker( sobj )
+      pk = get_netpk( sobj, 1 )
       if pk:isOk() then
         local data = pk:get()
         data.visual_name = "new\\supernevidimka_orig"
@@ -1083,7 +1089,7 @@ function fix_war_door_lab()
 end
 
 
-function fix_find_chip()
+function fix_find_chip( ver )
   if ver == 0 then return end
   news_manager.skip_send_task = true
   if
@@ -1106,7 +1112,7 @@ function fix_find_chip()
 end
 
 
-function fix_dragunov_ohota_talk()
+function fix_dragunov_ohota_talk( ver )
   if ver == 0 then return end
   if
     db.actor:has_info( "dragunov_ohota_start" )
@@ -1177,5 +1183,379 @@ function fix_show_news()
   if amk.has_g_timer( "show_news" ) then
     log2( "dsh: found show_news amk timer, removing..." )
     amk.remove_timer( "show_news" )
+  end
+end
+
+
+function fix_bandit_goodwill() end
+
+
+function fix_kotobegemot_bar()
+  local sobj = alife():story_object( 19901 )
+  if sobj then
+    log2( "dsh: found %s, deleting...", sobj:name() )
+    alife():release( sobj )
+  end
+end
+
+
+function fix_drop_boxes( ver )
+  if ver == 0 then return end
+  for _, v in ipairs( xr_box_data.def_boxes ) do
+    local name, spawn_id = unpack( v )
+    local sobj = alife():object( name )
+    if sobj then
+      log2( "dsh: found %s, skipping", sobj:name() )
+    else
+      log2( "dsh: %s not found, respawning...", name )
+      sobj = alife():create( spawn_id )
+      local pk = get_netpk( sobj, 1 )
+      ASSERT( pk:isOk(), "can't read netpacket of %s", sobj:name() )
+      local data = pk:get()
+      data.visual_name = [[physics\box\box_wood_01]]
+      data.custom_data:setString(
+        "[drop_box]\norig_name = " .. name .. "\ncommunity = def_box\n"
+      )
+      data.physic_type = 3
+      data.mass        = 10
+      pk:set( data )
+    end
+  end
+end
+
+
+function fix_running_treasure()
+  dsh.start_gtimerDHMS(
+    "dsh_running_treasure.clear_rnd_treasure",
+    0, math.random( 20, 24 * 7 ), 0, 0,
+    "dsh_running_treasure.spawn_rnd_treasure"
+  )
+end
+
+
+function fix_jup_gun_3()
+  local items = {
+    "jup_gun_2", "jup_gun_3",
+    "jup_ammo_1", "jup_ammo_2", "jup_ammo_3", "jup_ammo_4", "jup_ammo_5",
+    "jup_ammo_6", "jup_ammo_7",
+  }
+  for _, n in ipairs( items ) do
+    local sobj = alife():object( n )
+    if sobj then
+      log2( "dsh: found %s, removing...", sobj:name() )
+      alife():release( sobj )
+    end
+  end
+end
+
+
+function fix_letters( ver )
+  if ver == 0 then return end
+  local items = {}
+  db.actor:iterate_inventory(
+    function( npc, obj )
+      if obj:section() == "letter" then
+        table.insert( items, obj )
+      end
+    end,
+    db.actor
+  )
+  for _, obj in ipairs( items ) do
+    log2( "dsh: found %s, removing...", obj:name() )
+    ogse.remove_item_from_inventory( obj )
+  end
+end
+
+
+function fix_krest_topor( ver )
+  if ver == 0 then return end
+  if
+    db.actor:has_info( "krest_topor" )
+    and not db.actor:has_info( "krest_topor_done" )
+  then
+    log2( "dsh: giving 'krest_topor_done' info_portion" )
+    news_manager.skip_send_task = true
+    db.actor:give_info_portion( "krest_topor_done" )
+    dsh.timeout( 0, function()
+      news_manager.skip_send_task = false
+    end )
+  end
+end
+
+
+function fix_sleep_bags()
+  -- Подушка на диване, в подвале ДН.
+  dsh.spawn_physic_sleep_bag(
+    vector():set( -214.66897583008,-22.854312896729,-127.25451660156 ),
+    39266, 59
+  )
+  -- На АС, в штабе.
+  dsh.spawn_physic_sleep_bag(
+    vector():set( -19.310693740845,-3.7826442718506,-21.311328887939 ),
+    288157, 1593
+  )
+  -- У Борова, в ТД.
+  dsh.spawn_physic_sleep_bag(
+    vector():set( 39.124752044678,4.880298614502,-81.890159606934 ),
+    223240, 1100
+  )
+  -- У ученых в бункере, на Янтаре.
+  dsh.spawn_physic_sleep_bag(
+    vector():set( 30.377950668335,-10.974708557129,-279.49533081055 ),
+    54978, 1480
+  )
+  -- На Баре, в штабе Долга.
+  dsh.spawn_physic_sleep_bag(
+    vector():set( 232.12272644043,-5.1097793579102,128.38359069824 ),
+    59078, 1200
+  )
+  -- В Баре, у ремонтников.
+  dsh.spawn_physic_sleep_bag(
+    vector():set( 113.90551757813,-4.9745478630066,13.434575080872 ),
+    33613, 1239
+  )
+  -- На Агропроме, на втором этаже, над сталкерами.
+  dsh.spawn_physic_sleep_bag(
+    vector():set( 0.75571030378342,7.836715221405,14.530187606812 ),
+    239682, 682
+  )
+  -- На Свалке, в ангаре.
+  dsh.spawn_physic_sleep_bag(
+    vector():set( -73.496315002441,-1.8777117729187,16.13635635376 ),
+    134381, 330
+  )
+  -- На Болотах, у охотников.
+  dsh.spawn_physic_sleep_bag(
+    vector():set( 409.00204467773,3.5339589118958,236.85739135742 ),
+    409496, 3546
+  )
+  -- На Болотах, на базе ЧН.
+  dsh.spawn_physic_sleep_bag(
+    vector():set( -141.90623474121,1.1168230772018,-318.71026611328 ),
+    75332, 3374
+  )
+  -- На Генераторах, в развалинах дома.
+  dsh.spawn_physic_sleep_bag(
+    vector():set( -122.82690429688,38.734680175781,-522.4990234375 ),
+    194439, 3089
+  )
+  -- В Красном Лесу, у моста.
+  dsh.spawn_physic_sleep_bag(
+    vector():set( -119.96662902832,0.89263081550598,-256.01147460938 ),
+    9112, 3241
+  )
+  -- В Красном Лесу, в вогончике у сталкеров.
+  dsh.spawn_physic_sleep_bag(
+    vector():set( 14.4216381073,1.4473948478699,-46.648189544678 ),
+    74929, 3290
+  )
+  -- На АТП, рядом с Калининым.
+  dsh.spawn_physic_sleep_bag(
+    vector():set( -173.61164855957,3.5274684429169,225.39572143555 ),
+    125764, 2799
+  )
+  -- На Неразведанной Земле, в домике у Отшельника.
+  dsh.spawn_physic_sleep_bag(
+    vector():set( -344.14367675781,-8.6550722122192,-7.5538892745972 ),
+    277313, 2889
+  )
+end
+
+
+-- пересоздать дверь в оружейку Борова
+function fix_val_door_nedostroyka()
+  if level.name() == "l04_darkvalley" then
+    local sobj = alife():object( "val_door_nedostroyka" )
+    if sobj then
+      alife():release( sobj )
+      alife():create( 5713 )
+    end
+  end
+end
+
+
+function fix_bar_arena_triger()
+  local bad_sr = {
+    "bar_arena_triger",
+    "bar_arena_comment_1",
+    "bar_arena_comment_1_0000",
+    "bar_arena_comment_1_0001",
+    "bar_arena_rank_checker",
+    "bar_arena_check_death",
+    "bar_arena_comment_1_0002",
+    "bar_arena_comment_1_0003",
+    "bar_arena_comment_1_0004",
+    "bar_arena_comment_1_0005",
+    -- "bar_arena_restrictor",
+  }
+  for _, n in ipairs( bad_sr ) do
+    local sobj = alife():object( n )
+    if sobj then
+      log2( "dsh: found %s, removing...", sobj:name() )
+      alife():release( sobj )
+    end
+  end
+end
+
+
+function fix_wpn_toz34_arena( ver )
+  if ver == 0 then return end
+  for id = 1, 65534 do
+    local sobj = alife():object( id )
+    if sobj and isMagazinedWeapon( sobj ) then
+      local ammo = parse_names(
+        get_string( sobj:section_name(), "ammo_class", "" )
+      )
+      local pk = get_netpk( sobj, 1 )
+      if pk:isOk() then
+        local data      = pk:get()
+        local ammo_type = data.ammo_type
+        if ammo_type >= table.getn( ammo ) then
+          log2(
+            "dsh: found wrong ammo_type: %s: %s >= %s",
+            sobj:name(), ammo_type, table.getn( ammo )
+          )
+          data.ammo_type = 0
+          pk:set( data )
+        end
+      end
+    end
+  end
+end
+
+
+function fix_explosive_barrel()
+  local loc  = {
+    "l01_escape",
+    "l02_garbage",
+    "l03_agroprom",
+    "l04_darkvalley",
+    "l05_bar",
+    "l07_military",
+    "marsh",
+  }
+  local sect = {
+    "explosive_barrel",
+    "explosive_fuelcan",
+    "explosive_mobiltank",
+  }
+  for i = 1, 65535 do
+    local sobj = alife():object( i )
+    if
+      sobj and sect[ sobj:section_name() ]
+      and loc[ object_level_name( sobj ) ]
+    then
+      log2( 
+        "dsh: found %s on %s, removing", sobj:name(), object_level_name( sobj )
+      )
+      alife():release( sobj )
+    end
+  end
+end
+
+
+function fix_tamaz_body2()
+  local sobj = alife():object( "tamaz_body2" )
+  if sobj then
+    log2( "dsh: found %s, removing...", sobj:name() )
+    alife():release( sobj )
+  end
+end
+
+
+function fix_gar_dm_novice( ver )
+  if ver == 0 then return end
+  local names = {
+    [ "gar_dm_novice"   ] = 3970,
+    [ "gar_seryi_drug2" ] = 4032,
+    [ "gar_seryi_drug3" ] = 4051,
+  }
+  for name, spawn_id in pairs( names ) do
+    local sobj = alife():object( name )
+    if sobj then
+      log2( "dsh: found %s, recreating and teleporting...", sobj:name() )
+      local pos = sobj.position
+      local lvid, gvid = sobj.m_level_vertex_id, sobj.m_game_vertex_id
+      alife():release( sobj )
+      sobj = alife():create( spawn_id )
+      alife():teleport_object( "", pos, lvid, gvid, sobj.id )
+    end
+  end
+end
+
+
+function fix_rebind_keys( ver )
+  if ver == 0 then return end
+  local keys = {
+    [ "night_vision" ] = "ogse_nv_bind",
+    [ "scores"       ] = "ogse_antirad_bind",
+    [ "cam_4"        ] = "ogse_energy_drink_bind",
+    [ "cam_3"        ] = "ogse_yod_bind",
+    [ "torch"        ] = "ogse_bipsizon_bind",
+    [ "drop"         ] = "ogse_handradio_bind",
+    [ "buy_menu"     ] = "ogse_quicksave_bind",
+  }
+  local data = dsh_cfg.get_data()
+  for k, v in pairs( keys ) do
+    local dik = get_console():get_integer( v )
+    if v then
+      local kn = ogse_rebind_key.dik_to_name( dik )
+      if kn ~= "" then
+        log2( "dsh: rebind %s to %s", k, kn )
+        data[ k ] = kn
+        cmd( "bind " .. k, kn )
+      end
+    end
+  end
+  dsh_cfg.save()
+end
+
+
+function fix_podval_btr_nevid1( var )
+  for _, name in ipairs({ "podval_btr_nevid1", "podval_btr_nevid2" }) do
+    local sobj = alife():object( name )
+    if sobj then
+      log2( "dsh: found %s, removing...", sobj:name() )
+      alife():release( sobj )
+    end
+  end
+end
+
+
+function fix_spawn_bunker_sekret( ver )
+  if ver == 0 then return end
+  local items = {
+    [ "neizv_zapiska" ] = {
+      [ "args" ] = { vector():set( 7.608, -22.439, 13.871 ), 7695, 2773 },
+    },
+    [ "osnova_fotik"  ] = {
+      [ "args" ] = { vector():set( 7.608, -22.439, 13.871 ), 7695, 2773 },
+    },
+  }
+  for i = 1, 65535 do
+    local sobj = alife():object( i )
+    if
+      sobj and items[ sobj:section_name() ]
+      and sobj.parent_id == 65535
+      and object_level_name( sobj ) == "l10u_bunker"
+    then
+      items[ sobj:section_name() ].sobj = sobj
+    end
+  end
+  for k, v in pairs( items ) do
+    if v.sobj then
+      log2( "dsh: found %s, recreating...", v.sobj:name() )
+      alife():release( v.sobj )
+      alife():create( k, unpack( v.args ) )
+    end
+  end
+end
+
+
+function fix_bunker_art_v_spiral_restrictor( ver )
+  local sobj = alife():object( "bunker_art_v_spiral_restrictor" )
+  if sobj then
+    log2( "dsh: found %s, removing...", sobj:name() )
+    alife():release( sobj )
   end
 end

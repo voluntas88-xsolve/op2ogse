@@ -5,29 +5,31 @@
 --------------------------------------------------------------------------------
 
 function attach(sm)
+  sm:subscribe({ signal = "on_first_update", fun = this.on_first_update })
   sm:subscribe({ signal = "on_destroy",  fun = this.on_destroy     })
   sm:subscribe({ signal = "on_helmet_on_off_done", fun = this.on_helmet_on_off_done })
   sm:subscribe({ signal = "on_hit",      fun = this.on_hit         })
   sm:subscribe({ signal = "on_key_down", fun = this.chek_keys      })
   sm:subscribe({ signal = "on_key_up",   fun = this.chek_keys_free })
   sm:subscribe({ signal = "on_spawn",    fun = this.on_spawn       })
-  sm:subscribe({ signal = "on_update",   fun = this.on_update      })
+  sm:subscribe({ signal = "on_update",   fun = this.check_my_suit_hud_update })
+  sm:subscribe({ signal = "on_update",   fun = this.show_time_update })
+  sm:subscribe({ signal = "on_update",   fun = this.ui_rad_update  })
+  if amk.load_variable( "option_hud", 2 ) == 2 then
+    sm:subscribe({ signal = "on_update", fun = this.blurs_update })
+  end
 end
 auto_attach = true
 
 
--- чтобы отключить эффект, поставьте вместо единицы ноль:
-local blurs_enable = monnoroch_options.blurs_enable
-local blood_enable = monnoroch_options.blood_enable
-local bleed_enable = monnoroch_options.bleed_enable
-
-local blood_intensity  = 0
+local cam_fov          = get_con_float( "cam_fov" ) or 67.5
 local mycurrent_suithud
 local need_sniper_chek = false
 local sniper_mode      = false
 local suit_condition
 local suithud, suithud_enable = true, false
 local wotsuittype      = ""
+local wpn_zoom_mode    = false
 
 local sm = ogse_signals.get_mgr()
 
@@ -45,24 +47,57 @@ function on_destroy()
 end
 
 
-local show_time_t
-function on_update()
-  -- Обновление шкалы радиации и худа при использовании бинокля/прицела
-  check_sniper()
-  update_hud_elements()
-  -- Обновление шкалы радиации и худа при использовании бинокля/прицела
-  -- Динамический худ
-  doabcevents()
-  -- Динамический худ
-  if ( not show_time_t ) or show_time_t <= time_global() then
-    sak.show_time()
-    show_time_t = time_global() + 1000
+function on_first_update()
+  sm:subscribe({ signal = "on_item_to_slot", fun = this.on_item_to_slot })
+  if suithud and not suithud_enable then
+    suithud_enable = true
+    check_my_suit_hud()
+  end
+  ui_rad.update( true )
+  sak.show_time()
+end
+
+
+function on_item_to_slot( obj )
+  if obj:is_outfit() then
+    check_my_suit_hud( true )
   end
 end
 
 
+class "check_sniper_timer" ( ogse_qt.quick_timer )
+function check_sniper_timer:__init() super()
+  self.hidden         = false
+  self.on_sniper_mode = false
+  self.sniper_mode    = false
+  self.zoom_mode      = false
+  self.zoomed         = false
+end
+
+
+function check_sniper_timer:condition()
+  return not ( self.sniper_mode or self.zoom_mode )
+end
+
+
+function check_sniper_timer:action()
+end
+
+
+function check_sniper_timer:update()
+  ogse_signals.get_mgr():reschedule( 50 )
+  self:check_sniper()
+  self:update_hud_elements()
+end
+
+
 -- Убирание худа при использовании оптического прицела или бинокля
-function check_sniper()
+function check_sniper_timer:check_sniper()
+  sniper_mode            = false
+  bind_stalker.scopeUsed = false
+  self.sniper_mode       = false
+  self.zoom_mode         = false
+  wpn_zoom_mode          = false
   if
     db.actor and db.actor:alive()
     and ( need_sniper_chek == true or sniper_mode == true )
@@ -70,12 +105,11 @@ function check_sniper()
     if zoom_mode() == 1 then
       local wpn = db.actor:active_item()
       if wpn and wpn:is_weapon() then
-        local scope_status = ogse_wpn_utils.get_scope_status( wpn )
-        local scope_flag = scope_status == 1
-          or (
-            scope_status == 2 and ogse_wpn_utils.get_scope_flag( wpn )
-          )
-        if scope_flag then
+        if self.scope_sect == nil then
+          self.scope_sect = ogse_night_vision.get_active_scope_section( wpn )
+            or false
+        end
+        if self.scope_sect then
           local gl_status = 0
           if wpn:is_weapon_gl() then
             gl_status = ogse_wpn_utils.get_grenade_launcher_status( wpn )
@@ -84,87 +118,68 @@ function check_sniper()
             or (
               gl_status == 2 and ogse_wpn_utils.get_grenade_launcher_flag( wpn )
             )
-          if
-            ( not gl_flag )
-            or ( not ogse_wpn_utils.get_gl_mode( wpn ) )
-          then
+          if gl_flag and ogse_wpn_utils.get_gl_mode( wpn ) then
+            self.zoom_mode = true
+            wpn_zoom_mode  = true
+          else
             local binder = wpn:binded_object()
-            if
-              ( not binder )
-              or ( not binder[ "dsh_switch_scope.use_iron_scope" ] )
-            then
-              sniper_mode = true
+            if binder and binder[ "dsh_switch_scope.use_iron_scope" ] then
+              self.zoom_mode = true
+              wpn_zoom_mode  = true
+            else
+              sniper_mode            = true
               bind_stalker.scopeUsed = true
-              return
+              self.sniper_mode       = true
             end
           end
+        else
+          self.zoom_mode = true
+          wpn_zoom_mode  = true
         end
       end
     end
   end
-  sniper_mode = false
-  bind_stalker.scopeUsed = false
 end
 
 
 -- Обновление динамических элементов худа
-local on_sniper_mode = false
-function update_hud_elements()
-  if db.actor and db.actor:alive() then
-    if sniper_mode == true then
-      if suithud_enable then
-        suithud_enable = false
-        set_my_suit_hud()
-      end
-      ui_rad.update( false )
-      if not on_sniper_mode then
-        sak.show_time()
-        if not wpn_IsRotatingToZoom( db.actor:active_item() ) then
-          ogse_night_vision.on_sniper_mode( true )
-          on_sniper_mode = true
+function check_sniper_timer:update_hud_elements()
+  if self.sniper_mode then
+    if not self.on_sniper_mode then
+      if not self.hidden then
+        if suithud_enable then
+          suithud_enable = false
+          set_my_suit_hud()
         end
-      end
-    else
-      if suithud and not suithud_enable then
-        suithud_enable = true
-        check_my_suit_hud()
-      end
-      ui_rad.update( true )
-      if on_sniper_mode then
-        ogse_night_vision.on_sniper_mode( false )
+        ui_rad.update( false )
         sak.show_time()
-        on_sniper_mode = false
+        self.hidden = true
+      end
+      if not wpn_IsRotatingToZoom( db.actor:active_item() ) then
+        ogse_signals.get_mgr():call( "on_sniper_mode", true )
+        self.on_sniper_mode = true
       end
     end
-  else
-    if suithud_enable then
-      suithud_enable = false
-      set_my_suit_hud()
+  elseif self.hidden then
+    if suithud and not suithud_enable then
+      suithud_enable = true
+      check_my_suit_hud()
     end
-    if amk.load_variable( "option_rad", 1 ) > 0 then
-      ui_rad.update( false )
+    ui_rad.update( true )
+    sak.show_time()
+    if self.on_sniper_mode then
+      ogse_signals.get_mgr():call( "on_sniper_mode", false )
+      self.on_sniper_mode = false
     end
-  end
-end
-
-
-local freemem  = 0
-local freemem2 = 0
-
-function doabcevents()
-  if not db.actor then return end
-  local chkfreetime = time_global()
-  if freemem == 0 then freemem = time_global() + 1000 end
-  if chkfreetime > freemem then
-    freemem = 0
-    check_my_suit_hud()
---    bleed_condition()
-  end
-  local chkfreetime2 = time_global()
-  if freemem2 == 0 then freemem2 = time_global() + 40 end
-  if chkfreetime2 > freemem2 then
-    freemem2 = 0
-    init_blurs()
+    self.hidden = false
+  elseif self.zoom_mode then
+    if not self.zoomed then
+      check_my_suit_hud( true )
+      self.zoomed = true
+    end
+  elseif self.zoomed then
+    check_my_suit_hud( true )
+    self.zoomed = false
   end
 end
 
@@ -172,17 +187,22 @@ end
 local last_shader_mode = "off"
 function switch_shader_effects( mode )
   if mode ~= last_shader_mode then
-    cmd( "r2_rain_drops_control " .. mode )
-    cmd( "r2_lens_dirt_control "  .. mode )
+    if mode == "off" or not ui_mm_opt_main.GetOption( "weather_norain" ) then
+      cmd( "r2_rain_drops_control " .. mode )
+      cmd( "r2_lens_dirt_control "  .. mode )
+    end
     last_shader_mode = mode
   end
 end
 
 -- Проверка нажатия клавиш
 function chek_keys( key, bind )
-  if sniper_mode or level.main_input_receiver() then return end
+  if sniper_mode or level.main_input_receiver() or not db.actor:alive() then
+    return
+  end
   if bind == key_bindings.kWPN_ZOOM then
     need_sniper_chek = true
+    check_sniper_timer():start()
   elseif key == dsh.get_kbd_key( "helmet_on_off" ) then
     helmet_on_off()
   end
@@ -197,11 +217,14 @@ function chek_keys_free( key, bind )
 end
 
 
-local smoktime = 0
-function check_my_suit_hud()
+function check_my_suit_hud_update()
+  ogse_signals.get_mgr():reschedule( 1000 )
+  check_my_suit_hud()
+end
+
+
+function check_my_suit_hud( redraw )
   if not suithud_enable then return end
-  local gsmktime = time_global()
-  if smoktime == 0 then smoktime = time_global() + 4000 end
   if db.actor then
     local csuithud = db.actor:get_current_outfit()
     local suithudtype, isitbino, suithudname
@@ -237,7 +260,7 @@ function check_my_suit_hud()
       wotsuittype = nil
     end
     if not db.actor:alive() then suithudtype = nil end
-    set_my_suit_hud( dynamic_hud_enable, suithudtype )
+    set_my_suit_hud( dynamic_hud_enable, suithudtype, redraw )
   end
 end
 
@@ -246,13 +269,16 @@ local suitfirstrun = true
 local is_helmet_on = false
 local hidden_hud
 
-function set_my_suit_hud( dynamic_hud_enable, hudtype )
+function set_my_suit_hud( dynamic_hud_enable, hudtype, redraw )
   if not hudtype and not dynamic_hud_enable then
     if is_helmet_on and not sniper_mode then
       sm:call( "on_actor_before_helmet_off" )
     end
     local wchud = get_hud():GetCustomStatic( mycurrent_suithud )
-    if wchud then get_hud():RemoveCustomStatic( mycurrent_suithud ) end
+    if wchud then
+      get_hud():RemoveCustomStatic( mycurrent_suithud )
+      sm:call( "on_hud_hide" )
+    end
     suitfirstrun = true
     switch_shader_effects( "off" )
     if sniper_mode then
@@ -266,17 +292,23 @@ function set_my_suit_hud( dynamic_hud_enable, hudtype )
     return
   end
   local call_helmet = false
-  if hudtype ~= mycurrent_suithud then
+  if redraw or hudtype ~= mycurrent_suithud then
     if mycurrent_suithud then
       get_hud():RemoveCustomStatic( mycurrent_suithud )
+      sm:call( "on_hud_hide" )
     end
     if hudtype then
-      get_hud():AddCustomStatic( hudtype )
+      sm:call( "on_before_hud_show" )
+      local cs = get_hud():AddCustomStatic( hudtype )
+      if cs and wpn_zoom_mode then
+        cs:wnd():SetWndRect( -512, -32, 1536, 800 )
+      end
+      ui_rad.update( true )
       sak.show_time( true )
       sm:call( "on_hud_show" )
       if string.find( hudtype, wotsuittype ) then
         if
-          ( not suitfirstrun )
+          ( not ( suitfirstrun or redraw ) )
           and suit_condition ~= "green"
           and suit_condition ~= "blue"
         then
@@ -292,7 +324,7 @@ function set_my_suit_hud( dynamic_hud_enable, hudtype )
         end
       end
     end
-    if not hidden_hud then
+    if not ( hidden_hud or redraw ) then
       call_helmet = true
     end
   end
@@ -319,38 +351,19 @@ function get_current_helmet()
 end
 
 
-local isactcondset = false
-local radeffect    = false
-function bleed_condition()
-  if bleed_enable == 0 then return end
-  if db.actor.health < 0.31 and not isactcondset then
-    level.add_pp_effector( "alcohol.ppe", 2012, true )
-    isactcondset = true
-  end
-  if db.actor.health > 0.30 and isactcondset then
-    level.remove_pp_effector( 2012 )
-    isactcondset = false
-  end
-  if db.actor.radiation > 0.3 and not radeffect then
-    level.add_pp_effector( "alcohol.ppe", 2013, true )
-    radeffect = true
-  end
-  if db.actor.radiation == 0 and radeffect then
-    level.remove_pp_effector( 2013 )
-    radeffect = false
-  end
+function blurs_update()
+  ogse_signals.get_mgr():reschedule( 40 )
+  init_blurs()
 end
 
 
 function init_blurs()
-  if blurs_enable == 0 then return end
   if amk.load_variable( "option_hud", 2 ) < 2 then return end
   if
     mycurrent_suithud
-    and ( not string.find( mycurrent_suithud, "_red3"    ) )
-    and ( not string.find( mycurrent_suithud, "hud_sci_" ) )
+    and not string.find( mycurrent_suithud, "_red3", -5, true )
   then
-    local zoom = 67.5 / device().fov
+    local zoom = cam_fov / device().fov
     zoom =( zoom - 1 ) * 1.5 + 1
     if zoom < 1.001 then
       zoom = 1.001
@@ -395,11 +408,13 @@ function set_blurs( enabled, rect )
   -- Циклы в зависимости от силы дыхания: 0->1->0 0->1->2->4->5->0 0->1->2->3->4->5->0 5->4->3->4->5 4->3->4
   local power  = db.actor.power
   -- текущая частота дыхания от 30 до 120 циклов в минуту
-  local period = 1.0 + power * power * 1.0
-  local expirt = 0.3
+  local period      = 1.0 + power ^ 2
+  local expirt      = 0.3
   local breathpower = 3
-  local delta  = ( time_global() - blurlt     ) / 1000 -- дельта в секундах
-  local phase  = ( time_global() -blurcyctime ) / 1000 -- фаза дыхательного цикла в сек.
+  -- дельта в секундах
+  local delta       = ( time_global() - blurlt      ) / 1000
+  -- фаза дыхательного цикла в сек.
+  local phase       = ( time_global() - blurcyctime ) / 1000
   blurlt = time_global()
   if phase > period then
     phase = phase % period
@@ -426,7 +441,7 @@ function set_blurs( enabled, rect )
   local v   = 1 - ( blurval * 3 - math.floor( blurval * 3 ) )
   local v1  = 1 - v
   if tm ~= 0 then
-    blurs[ tm ]:SetColor( GetARGB( v * 255, 255, 255, 255 ) )
+    blurs[ tm  ]:SetColor( GetARGB( v  * 255, 255, 255, 255 ) )
   end
   if tmn ~= 0 then
     blurs[ tmn ]:SetColor( GetARGB( v1 * 255, 255, 255, 255 ) )
@@ -446,13 +461,27 @@ function is_sniper_mode()
 end
 
 
+function is_wpn_zoom_mode()
+  return wpn_zoom_mode
+end
+
+
 local active_pnv, active_torch
 function helmet_on_off()
+  local outfit = db.actor:get_current_outfit()
+  if
+    not (
+      outfit
+      and get_bool( outfit:section(), "dynamic_hud_enable", false )
+    )
+  then
+    return
+  end
   if suithud then
     suithud, suithud_enable = false, false
     ogse.save_var( script_name() .. ".helmet_on_off.status", false, "bool" )
   else
-    suithud, suithud_enable = true, false
+    suithud, suithud_enable = true, true
     ogse.save_var( script_name() .. ".helmet_on_off.status", true,  "bool" )
     dsh_hud_fx.force_on_helmet()
   end
@@ -466,6 +495,7 @@ function helmet_on_off()
     torch:switch_torch( false )
   end
   set_my_suit_hud()
+  check_my_suit_hud()
 end
 
 
@@ -485,4 +515,16 @@ end
 
 function on_hit( obj, amount, dir, who, bone_index )
   
+end
+
+
+function show_time_update()
+  ogse_signals.get_mgr():reschedule( 2000 )
+  sak.show_time()
+end
+
+
+function ui_rad_update()
+  ogse_signals.get_mgr():reschedule( 500 )
+  ui_rad.update( db.actor:alive() and not sniper_mode )
 end

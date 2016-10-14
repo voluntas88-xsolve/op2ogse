@@ -1900,6 +1900,7 @@ bleeding_restore_speed = 0.0
 hit_absorbation_sect = af_fireball_absorbation
 
 art_hit.art_hit = 0.3, 0.3, burn
+bind_stalker.on_take_call = flamethrower.have_a_fire_kolobok
 dsh.simpliest_art = true
 smart_monster_parts.create_item = mutant_af_fireball
 
@@ -2917,7 +2918,7 @@ radiation_immunity = 1.0
 telepatic_immunity = 1.0
 chemical_burn_immunity = 1.0
 explosion_immunity = 1.0
-fire_wound_immunity  = 1.10
+fire_wound_immunity  = 1.50
 
 
 ; "Плёнка"
@@ -5077,7 +5078,9 @@ power_restore_speed		= 0.0
 bleeding_restore_speed	= 0.0
 
 hit_absorbation_sect		= af_inferno_absorbation
-art_hit.art_hit = 0.6, 0.3, chemical_burn
+
+art_hit.art_hit      = 0.6, 0.3, chemical_burn
+watcher_act.bad_item = true
 
 [af_inferno_absorbation]
 burn_immunity = 1.0
@@ -5609,6 +5612,9 @@ bleeding_restore_speed 	= 0.0003
 hit_absorbation_sect 		= af_mayak_absorbation
 art_hit.art_hit = 0.3, 0.3, chemical_burn
 
+bind_stalker.on_take_call = akill.checking_taken_item81
+
+
 [af_mayak_absorbation]
 burn_immunity = 0.93
 strike_immunity = 0.96
@@ -5825,6 +5831,9 @@ bleeding_restore_speed	= -0.0029851
 
 hit_absorbation_sect		= af_provoloka_absorbation
 art_hit.art_hit = 0.6, 0.3, chemical_burn
+
+bind_stalker.on_take_call = akill.checking_taken_item83
+
 
 [af_provoloka_absorbation]
 burn_immunity = 1.0

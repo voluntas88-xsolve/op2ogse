@@ -1,0 +1,313 @@
+-- -*- mode: lua; coding: windows-1251-dos -*-
+
+-- Через какое время наступит полное загрязнение (в часах)
+local max_use_time = 10
+-- На сколько раз хватает одной фляжки
+local portions     = 3
+
+local textures = {
+  "hud_dirty_mask1",
+  "hud_dirty_mask2",
+  "hud_dirty_mask3",
+  "hud_dirty_mask4",
+  "hud_dirty_mask5",
+}
+
+
+function attach( sm )
+  sm:subscribe({
+    signal = "on_before_hud_show", fun = this.on_before_hud_show
+  })
+  sm:subscribe({
+    signal = "on_scope_sights_lighting", fun = this.on_sniper_mode
+  })
+  sm:subscribe({ signal = "on_hud_hide", fun = this.on_hud_hide })
+  sm:subscribe({ signal = "on_spawn",    fun = this.on_spawn    })
+  sm:subscribe({ signal = "on_update",   fun = this.on_update   })
+  sm:subscribe({ signal = "on_use",      fun = this.on_use      })
+end
+
+
+function on_spawn()
+  local sc = get_statics()
+  for _, n in ipairs( textures ) do
+    sc:show_static( n )
+  end
+end
+
+
+local pt
+function on_update()
+  ogse_signals.get_mgr():reschedule( 10000 )
+  if
+    db.actor:get_current_outfit()
+    and ogse_dynamic_hud.get_current_helmet()
+  then
+    if pt then
+      local prev_pt = game.CTime()
+      prev_pt:set( unpack( pt ) )
+      local cur_t   = game.get_game_time()
+      local dt      = math.floor( cur_t:diffSec( prev_pt ) )
+      pt = { cur_t:get() }
+      local cur_static = get_outfit_dirty_static()
+      set_outfit_use_time( dt )
+      local new_static = get_outfit_dirty_static()
+      if new_static ~= cur_static then
+        ogse_dynamic_hud.check_my_suit_hud( true )
+      end
+    else
+      pt = { game.get_game_time():get() }
+    end
+  else
+    pt = nil
+  end
+end
+
+
+local cur_outfit = {}
+function get_outfit_dirty_static()
+  local outfit = db.actor:get_current_outfit()
+  if not outfit then return end
+  if ( not cur_outfit.id ) or cur_outfit.id ~= outfit:id() then
+    local sobj = alife():object( outfit:id() )
+    ASSERT( sobj, "can't find sobj: %s", outfit:name() )
+    local pk   = get_netpk( sobj, 1 )
+    ASSERT( pk:isOk(), "can't read netpacket of %s", sobj:name() )
+    local data = pk:get()
+    local ini  = create_ini_file( data.custom_data:getString() )
+    local t = {}
+    t.id = outfit:id()
+    if ini:section_exist( script_name() ) then
+      t.use_time = get_u32( script_name(), "use_time", 0, ini )
+    else
+      t.use_time = 0
+    end
+    cur_outfit = t
+  end
+  if cur_outfit.use_time > 0 then
+    local max  = max_use_time * 3600
+    if cur_outfit.use_time > max then cur_outfit.use_time = max end
+    local step = math.floor( max / table.getn( textures ) )
+    local cur  = math.floor( cur_outfit.use_time / step )
+    if cur > 0 then
+      ASSERT( cur <= table.getn( textures ), "too big: cur = %s", cur )
+      return textures[ cur ]
+    end
+  end
+end
+
+
+function set_outfit_use_time( dt )
+  local max = max_use_time * 3600
+  if dt > 0 then
+    local rain_f = level.rain_factor()
+    if rain_f > 0 then
+      local step = math.floor( max / table.getn( textures ) )
+      dt = 0 - math.floor( step * rain_f )
+      if dt == 0 then return end
+    end
+  end
+  if cur_outfit.use_time == 0   and dt < 0 then return end
+  if cur_outfit.use_time >= max and dt > 0 then return end
+  cur_outfit.use_time = cur_outfit.use_time + dt
+  if cur_outfit.use_time < 0   then cur_outfit.use_time = 0   end
+  if cur_outfit.use_time > max then cur_outfit.use_time = max end
+  local outfit = db.actor:get_current_outfit()
+  local sobj   = alife():object( outfit:id() )
+  ASSERT( sobj, "can't find sobj: %s", outfit:name() )
+  local pk   = get_netpk( sobj, 1 )
+  ASSERT( pk:isOk(), "can't read netpacket of %s", sobj:name() )
+  local data = pk:get()
+  local cd   = data.custom_data:getTable()
+  if cur_outfit.use_time > 0 then
+    local t = cd[ script_name() ]
+    if not t then
+      t = {}
+      cd[ script_name() ] = t
+    end
+    t.use_time = cur_outfit.use_time
+  else
+    cd[ script_name() ] = nil
+  end
+  data.custom_data:set( cd )
+  pk:set( data )
+end
+
+
+function reset_outfit_use_time( step_k )
+  local outfit     = db.actor:get_current_outfit()
+  local cur_static = get_outfit_dirty_static()
+  local max        = max_use_time * 3600
+  local step       = math.floor( max / table.getn( textures ) ) * ( step_k or 1 )
+  if cur_outfit.use_time > step then
+    cur_outfit.use_time = cur_outfit.use_time - step
+  else
+    cur_outfit.use_time = 0
+  end
+  set_outfit_use_time( 0 )
+  ogse_dynamic_hud.check_my_suit_hud( true )
+end
+
+
+local static_in_use
+
+function on_hud_hide()
+  if static_in_use then
+    if get_hud():GetCustomStatic( static_in_use ) then
+      get_hud():RemoveCustomStatic( static_in_use )
+      static_in_use = nil
+    end
+  end
+  if ogse_dynamic_hud.is_sniper_mode() then
+    local static_name = get_outfit_dirty_static()
+    if static_name then
+      get_statics():show_static( static_name, true )
+    end
+  end
+end
+
+
+function on_before_hud_show()
+  get_statics():hide_static()
+  local static_name = get_outfit_dirty_static()
+  if static_name then
+    if not get_hud():GetCustomStatic( static_name ) then
+      local cs = get_hud():AddCustomStatic( static_name )
+      if cs and ogse_dynamic_hud.is_wpn_zoom_mode() then
+        cs:wnd():SetWndRect( -512, -32, 1536, 800 )
+      end
+      static_in_use = static_name
+    end
+  end
+end
+
+
+function on_sniper_mode()
+  if not ogse_dynamic_hud.get_current_helmet() then return end
+  local static_name = get_outfit_dirty_static()
+  if static_name then
+    get_statics():hide_static( static_name )
+    get_statics():show_static( static_name, true )
+  end
+end
+
+
+local STATICS
+function get_statics()
+  if not STATICS then
+    STATICS = dirty_static()
+  end
+  return STATICS
+end
+
+
+class "dirty_static" ( CUIScriptWnd )
+function dirty_static:__init() super()
+  self.initialized = false
+  self.xml = CScriptXmlInit()
+  self.xml:ParseFile( "ui_custom_msgs.xml" )
+  self:Init( 0, 0, 1024, 768 )
+  self.statics = {}
+end
+
+
+function dirty_static:reset()
+  local hud = get_hud()
+  if hud and self.initialized then
+    hud:RemoveDialogToRender( self )
+    self.initialized = false
+  end
+end
+
+
+function dirty_static:add_to_render()
+  if not self.initialized then
+    local hud = get_hud()
+    if hud then
+      hud:AddDialogToRender( self )
+      self.initialized = true
+    end
+  end
+end
+
+
+function dirty_static:is_active()
+  for k, v in pairs( self.statics ) do
+    if self.statics[ k ]:IsShown() then
+      return true
+    end
+  end
+  return false
+end
+
+
+function dirty_static:update_rects()
+  for k, v in pairs( self.statics ) do
+    self.statics[ k ]:SetWndRect( 0, 0, 1024, 768 )
+    self.statics[ k ]:Show( false )
+    self.statics[ k ]:SetStretchTexture( true )
+  end
+end
+
+
+function dirty_static:show_static( static, status )
+  if not self.statics[ static ] then
+    self.statics[ static ] = self.xml:InitStatic( static, self )
+    self:update_rects()
+  end
+  if status and not self.statics[ static ]:IsShown() then
+    self:add_to_render()
+    self.statics[ static ]:Show( true )
+  end
+end
+
+
+function dirty_static:hide_static( static )
+  if not static then
+    for k, v in pairs( self.statics ) do
+      if self.statics[ k ]:IsShown() then
+        static = k
+        break
+      end
+    end
+  end
+  if
+    static
+    and self.statics[ static ]
+    and self.statics[ static ]:IsShown()
+  then
+    self.statics[ static ]:Show( false )
+    self:reset()
+  end
+end
+
+
+function on_use( obj )
+  local sect = obj:section()
+  if sect == "flaska" then
+    local cond = obj:condition()
+    local fx
+    local removed = false
+    if
+      db.actor:get_current_outfit()
+      and ogse_dynamic_hud.get_current_helmet()
+      and get_outfit_dirty_static()
+    then
+      fx = "clean_mask"
+      local step = 1 / portions
+      cond = cond - step
+      if cond >= step / 2 then
+        dsh.set_condition( obj, cond )
+      else
+        ogse.remove_item_from_inventory( obj )
+        removed = true
+      end
+    else
+      fx = "flaska"
+      ogse.remove_item_from_inventory( obj )
+      removed = true
+    end
+    dsh_hud_fx.run_fx( sect, fx, nil, { [ "medkit_cond" ] = cond } )
+    if removed then return true end
+  end
+end

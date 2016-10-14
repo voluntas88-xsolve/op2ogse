@@ -227,9 +227,14 @@ local art_rnd      = 0.1        -- вероятность спауна артефакта
 
 
 function attach( sm )
+  sm:subscribe({ signal = "on_first_update",  fun = this.on_first_update })
   sm:subscribe({ signal = "on_monster_death", fun = this.death_spawn })
   sm:subscribe({ signal = "on_monster_hit",   fun = this.main_check  })
-  sm:subscribe({ signal = "on_take",          fun = this.on_take     })
+end
+
+
+function on_first_update()
+  ogse_signals.get_mgr():subscribe({ signal = "on_take", fun = this.on_take })
 end
 
 
@@ -331,7 +336,6 @@ function spawn_parts_for_actor( obj, number )
             if art then
               local sect = get_string( art, script_name() .. ".create_item" )
               ASSERT( sect, "create_item not found for %s", art )
-              log2( "dsh: [%s]: %s: spawning %s", script_name(), obj:name(), sect )
               spawn_part_in_inv( obj, sect )
             end
           end
@@ -344,7 +348,6 @@ end
 
 
 function on_take( obj )
-  if device().precache_frame > 0 then return end
   local sect = get_string( obj:section(), script_name() .. ".inv_item" )
   if sect then
     local sobj = alife():object( obj:id() )
@@ -396,7 +399,7 @@ function is_handmade_monster( obj )
   local is_handmade = false
   local sobj = alife():object( obj:id() )
   if sobj then
-    local pk = xs_netpk.monster( sobj )
+    local pk = get_netpk( sobj, 1 )
     if pk:isOk() then
       local data = pk:get()
       local cd   = data.custom_data:getString()
