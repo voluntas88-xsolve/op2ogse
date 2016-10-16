@@ -11,8 +11,8 @@ dsh mod для ОП-2
 - https://yadi.sk/d/dx4qvrDovYVVr
 
 Последнее обновление:
-- https://yadi.sk/d/c8h_FhU0wVDCx
-- Зеркало: https://drive.google.com/open?id=0B0h2HnCBW9H1NnlpUWF3aWtwdFk
+- https://yadi.sk/d/3DJrQ0VCwufYt
+- Зеркало: https://drive.google.com/open?id=0B0h2HnCBW9H1VXdBejlwTEpYS1k
 
 Измененный под меня Advancer's HUD, со шкалой пси здоровья:
 - https://yadi.sk/d/5G_TkvICmB4ty
@@ -703,6 +703,14 @@ $mod_dir$   		= false|	false|	$fs_root$|		mods\
 
 Если все правильно сделано, то в главном меню игры, внизу, будет
 соотв. надпись.
+
+
+Дополнения:
+
+bigfont.xdb - увеличивает шрифт в игре
+
+Для установки любого дополнения, нужно скопировать его в папку mods,
+см. выше. Для удаления - просто удалить из этой папки.
 
 
 Хочу выразить благодарность:

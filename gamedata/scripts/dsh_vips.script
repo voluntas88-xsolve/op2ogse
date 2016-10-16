@@ -10,6 +10,7 @@ local vip_npc = {
   [ "gen_solvador1"        ] = true, -- Сольвадор лезет в мины
   [ "kalmyak"              ] = true, -- Калмык
   [ "land_lazaret_starik"  ] = true, -- Старик на НЗ
+  [ "marsh_udav"           ] = true, -- Боцман на Болотах
   [ "mil_Svoboda_trader"   ] = true, -- Скряга
   [ "sak_military_stalker" ] = true, -- Шерстюк
   [ "val_bandit_trader"    ] = true, -- Жила
@@ -61,6 +62,14 @@ local vip_npc_info = {
   -- Кащей на Болотах, около мех. двора, по заданию Свиблова на ПКМ.
   [ "kashei"             ] = {
     [ "before" ] = "sveeblov_ferma_begin",
+  },
+
+  -- Трансмутатор. Часовой, который забирает водку и пьяный капитан.
+  [ "agro_chsovoy_trezv" ] = {
+    [ "before" ] = "chasovoy_trezv_say_start",
+  },
+  [ "trezv_kapitan"      ] = {
+    [ "before" ] = "chasovoy_trezv_say_start",
   },
 }
 
