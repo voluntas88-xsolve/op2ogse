@@ -360,7 +360,7 @@ function offline_alife_timer:update()
     end
     if table.getn( vdata.inv_boxes ) > 0 then
       -- есть контейнеры. Надо обыскать.
-      on_inv_boxes_found( victim, vdata )
+      --on_inv_boxes_found( victim, vdata )
     end
   end
 end
