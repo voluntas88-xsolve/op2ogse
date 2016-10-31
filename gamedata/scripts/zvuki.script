@@ -24,7 +24,7 @@ function on_use( obj )
   db.eat_snd = xr_sound.get_safe_sound_object(
     snd[ math.random( table.getn( snd ) ) ]
   )
-  db.eat_snd:play( db.actor, 0, sound_object.s2d )
+  --db.eat_snd:play( db.actor, 0, sound_object.s2d )
   if has_alife_info( "ui_inventory" ) then
     level.start_stop_menu( level.main_input_receiver(), true )
   end

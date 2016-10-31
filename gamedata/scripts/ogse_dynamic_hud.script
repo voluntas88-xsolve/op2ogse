@@ -233,49 +233,7 @@ local hud_cond_names = {
 }
 
 function check_my_suit_hud( redraw )
-  if not suithud_enable then return end
-  if db.actor then
-    local csuithud = db.actor:get_current_outfit()
-    local suithudtype, isitbino, suithudname
-    if csuithud then suithudname = csuithud:section() end
-    local changed_cond       = false
-    local dynamic_hud_enable = false
-    if suithudname then
-      suit_condition = ""
-      for _, v in ipairs( hud_cond_names ) do
-        if csuithud:condition() > v[ 2 ] then
-          suit_condition = v[ 1 ]
-          break
-        end
-      end
-      dynamic_hud_enable = get_bool( suithudname, "dynamic_hud_enable", false )
-      if dynamic_hud_enable then
-        wotsuittype      = get_string( suithudname, "dynamic_hud_type" )
-        local hud_prefix = get_string(
-          suithudname, "dynamic_hud_prefix", wotsuittype
-        )
-        if hud_prefix then
-          suithudtype = hud_prefix .. "_" .. suit_condition
-          -- маска может остаться той же самой, но может измениться ее
-          -- состояние. В таком случае - это просто перерисовка, а не
-          -- смена шлема.
-          if mycurrent_suithud and mycurrent_suithud ~= suithudtype then
-            for _, v in ipairs( hud_cond_names ) do
-              if mycurrent_suithud == ( hud_prefix .. "_" .. v[ 1 ] ) then
-                changed_cond = true
-                break
-              end
-            end
-          end
-        end
-      end
-    else
-      suithudtype = nil
-      wotsuittype = nil
-    end
-    if not db.actor:alive() then suithudtype = nil end
-    set_my_suit_hud( dynamic_hud_enable, suithudtype, redraw, changed_cond )
-  end
+
 end
 
 

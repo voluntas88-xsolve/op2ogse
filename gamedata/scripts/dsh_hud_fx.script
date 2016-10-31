@@ -202,9 +202,9 @@ end
 
 function get_cur_helmet_pp()
   local hud, helmet = ogse_dynamic_hud.get_current_helmet()
-  if helmet then
-    return hud_pp[ helmet ]
-  end
+  --if helmet then
+  -- return hud_pp[ helmet ]
+  --end
 end
 
 
@@ -381,7 +381,7 @@ function nlc7_actor_heart( helmet )
         .. math.random( nlc7_act_breath[ tip ][ step ][ 2 ] )
       local snd = sound_object( snd_fname )
       snd.volume = 2.5 - nlc7_act_breath[ tip ][ step ][ 3 ] - r_h
-      snd:play( db.actor, 0, sound_object.s2d )
+      --snd:play( db.actor, 0, sound_object.s2d )
       delt = time_curr
     end
   elseif ui_mm_opt_main.GetOption( "hud_plus_enabled" ) then

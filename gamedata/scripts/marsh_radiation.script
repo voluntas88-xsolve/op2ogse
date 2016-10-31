@@ -8,7 +8,6 @@ end
 
 
 function on_spawn()
-	return
   if level.name() ~= "marsh" or has_alife_info( "no_marsh_radiation" ) then
     return
   end
