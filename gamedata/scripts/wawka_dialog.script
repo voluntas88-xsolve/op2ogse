@@ -646,22 +646,12 @@ function good_item_have_number( itm_section, need_number, check_cond_f )
     function( actor, item )
       if item:section() == itm_section then
         cnt = cnt + 1
-        if check_cond_f then
-          if check_cond_f( item ) then
-            cnt_good = cnt_good + 1
-          end
-        else
-          if item:condition() > 0.95 then
-            cnt_good = cnt_good + 1
-          end
-        end
       end
     end,
     db.actor
   )
   if
-    ( cnt == need_number and cnt_good == need_number )
-    or ( cnt == cnt_good and cnt >= need_number )
+    ( cnt >= need_number )
   then
     return true
   end
