@@ -39,6 +39,7 @@ function actor_binder:net_spawn( data )
   self.am:call( "on_before_spawn" )
   zamok.restore()
   level.show_indicators()
+  level.set_snd_volume( 1 )
   self.bCheckStart = true
   if object_binder.net_spawn(self,data) == false then
     return false
@@ -219,7 +220,6 @@ function actor_binder:death_callback( victim, who )
   if victim:id() == db.actor:id() then
     archievements.on_actor_death( who )
   end
-	
   -- Правка неотключения пения контролера после смерти гг
   if kostya_dialog.kill_online_kontroller() then
     news_manager.send_tip(
@@ -228,6 +228,7 @@ function actor_binder:death_callback( victim, who )
      nil, "nano", 30000
     )
   end
+  level.set_snd_volume( 1 )
 end
 
 
@@ -239,7 +240,7 @@ function actor_binder:take_item_from_box( box, item )
 	
   -- подъем рюкзаков
   if box:is_inv_box_empty() then
-    if transparent_treasure.IsTaken( box:section() ) then 
+    if transparent_treasure.IsTaken( box:section(), box:name() ) then 
       level.start_stop_menu( level.main_input_receiver(), true )
       -- здесь можно прописывать калбеки взятия на проверку по секции тайника,
       -- чтобы не придумывать уникальные предметы
@@ -552,23 +553,24 @@ function actor_binder:update( delta )
       amk.start_timer_no_save(),
       "Этим сохранением пользоваться нельзя. Удалите его."
     )
-	
+
     ui_mm_opt_add.del_bad_objects()
-    self.bCheckStart = nil    
-  end 
-  
+    self.bCheckStart = nil
+  end
+
   amk.oau_watchdog = 0
-  amk.oau_reason   = ""    
-  
+  amk.oau_reason   = ""
+
   if update_was_never_called then
     self.am:call( "on_first_update" )
     update_was_never_called = false
+    self.am:delay_time_limit( 10000 )
   end
   self.am:call( "on_update", delta )
   -- event( "actor_update" ):trigger({ delta = delta })
-  
+
   -- Обновление упаковщика патронов -- должно быть предпоследним на апе актора!
-  dunin_ammo.on_update()	
+  dunin_ammo.on_update()
   -- Отложенное удаление патронов -- должно быть последним на апе актора!
   death_manager.release_deferred_ammo()
 end

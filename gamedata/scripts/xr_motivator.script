@@ -219,8 +219,8 @@ function check_sound( self, who, sound_type, sound_position, sound_power )
   blow.draftsman = who
   blow.type      = hit.wound
   blow.direction = utils.vector_copy_by_val(
-    self:position()):sub(who:position()
-  )
+    self:position()
+  ):sub( who:position() )
 
   -- Если тип задан проверим реакцию на него
   if snd_t and snd_t ~= "NIL" and not self:best_enemy() then
@@ -744,7 +744,10 @@ function motivator_binder:before_hit_callback( p_s_hit, p_ignore_flags )
           write_memory_int( 1, p_ignore_flags )
         end
       else
-        if get_bool( obj:section(), "dsh.hit_who_is_actor", false ) then
+        if
+          get_bool( obj:section(), "dsh.hit_who_is_actor", false )
+          or smart_monster_parts.is_handmade_monster( obj )
+        then
 --          write_memory_int(
 --            db.actor:cast_game_object(), p_s_hit, hit_offset.who
 --          )
@@ -1172,6 +1175,7 @@ function motivator_binder:on_item_drop( obj )
     )
     timer_drop_weapon( obj, self.object:id() ):start()
   end
+  self.am:call( "on_npc_item_drop", self.object, obj, sobj )
 end
 
 
@@ -1193,6 +1197,7 @@ function motivator_binder:on_item_take( obj )
   if obj:is_weapon() then
     ogse_wpn_utils.set_condition_shot_dec( obj, 0 )
   end
+  self.am:call( "on_npc_item_take", self.object, obj, sobj )
 end
 
 

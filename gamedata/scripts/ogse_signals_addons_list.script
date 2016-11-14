@@ -74,7 +74,7 @@ addons = {
   "sound_theme",
   "xr_sound",
   "dsh_energy_drink",
-  "dsh_exo_m134",
+  -- "dsh_exo_m134",
   "dsh_wpn",
   "ogse_hitfx",
   "xrs_medic",
@@ -92,11 +92,11 @@ addons = {
   "xrs_grenade",
   "amkii_equip",
   "rx_ai",
-  "rx_addons",
+  -- "rx_addons",
   "rx_gl",
   "rx_wmgr",
   "state_mgr",
-  "meceniy_wpn",
+  -- "meceniy_wpn",                -- аккумуляторы для минигана
   -- "meceniy_work",               -- зомбирование ГГ
   "sak",
   "braad_test",
@@ -117,5 +117,5 @@ addons = {
   "dsh_inv_colors",
   "netpacket_pda_binder",
 
-  "dsh_memuse",
+  -- "dsh_memuse",
 }

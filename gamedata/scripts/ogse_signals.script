@@ -6,61 +6,59 @@
 --| version 1.1                                                             |--
 -------------------------------------------------------------------------------
 
---[=[
-Можно подписывать на события глобальные функции, методы классов, "методы" таблиц, 
-функциональные объекты.
-
+-- Можно подписывать на события глобальные функции, методы классов,
+-- "методы" таблиц, функциональные объекты.
+--
 ------------===< Пример для глобальной функции: >===------------------------------
-
-function some_global_function(arg1, arg2)
-end
-local slot_desc = {signal = "signal_name", fun = some_global_function}
-ogse_signals.get_mgr():subscribe(slot_desc) -- подписали в очередь
---...
-ogse_signals.get_mgr():unsubscribe(slot_desc) -- отписали
-вызвали сигнал
-local sm = ogse_signals.get_mgr()
---...
-sm.call("signal_name", arg1, arg2)
-
+--
+-- function some_global_function(arg1, arg2)
+-- end
+-- local slot_desc = {signal = "signal_name", fun = some_global_function}
+-- ogse_signals.get_mgr():subscribe(slot_desc) -- подписали в очередь
+-- ...
+-- ogse_signals.get_mgr():unsubscribe(slot_desc) -- отписали
+-- вызвали сигнал
+-- local sm = ogse_signals.get_mgr()
+-- ...
+-- sm.call("signal_name", arg1, arg2)
+--
 ------------===< Пример для функционального объекта: >===-------------------------
-
-class "some_luabind_class"
-function some_luabind_class:__init()
-  local mt = getmetatable(self)
-  mt.__call = self.method_to_call
-end
-function some_luabind_class:method_to_call()
-end
-
-local slot_desc = {signal = "signal_name", fun = some_luabind_class()}
-ogse_signals.get_mgr():subscribe(slot_desc) -- подписали в высокоприоритетную очередь
---...
-ogse_signals.get_mgr():unsubscribe(slot_desc) -- отписали
-
-Функциональный класс на таблице строится немного сложнее
-local t = {}
-function t:method_to_call()
-end
-local mt = {}
-mt.__call = t.method_to_call
-getmetatable(t, mt)
-end
-
+--
+-- class "some_luabind_class"
+-- function some_luabind_class:__init()
+--   local mt = getmetatable(self)
+--   mt.__call = self.method_to_call
+-- end
+-- function some_luabind_class:method_to_call()
+-- end
+--
+-- local slot_desc = {signal = "signal_name", fun = some_luabind_class()}
+-- ogse_signals.get_mgr():subscribe(slot_desc) -- подписали в высокоприоритетную очередь
+-- ...
+-- ogse_signals.get_mgr():unsubscribe(slot_desc) -- отписали
+--
+-- Функциональный класс на таблице строится немного сложнее
+-- local t = {}
+-- function t:method_to_call()
+-- end
+-- local mt = {}
+-- mt.__call = t.method_to_call
+-- getmetatable(t, mt)
+-- end
+--
 ------------===< Пример для произвольного метода класса: >===----------------------
-
-class "some_luabind_class"
-function some_luabind_class:__init()
-end
-function some_luabind_class:method_to_call()
-end
-
-class obj = some_luabind_class()
-local slot_desc = {signal = "signal_name", self = obj, fun = obj.method_to_call}
-ogse_signals.get_mgr():subscribe(slot_desc) -- подписали в высокоприоритетную очередь
---...
-ogse_signals.get_mgr():unsubscribe(slot_desc) -- отписали
---]=]
+--
+-- class "some_luabind_class"
+-- function some_luabind_class:__init()
+-- end
+-- function some_luabind_class:method_to_call()
+-- end
+--
+-- class obj = some_luabind_class()
+-- local slot_desc = {signal = "signal_name", self = obj, fun = obj.method_to_call}
+-- ogse_signals.get_mgr():subscribe(slot_desc) -- подписали в высокоприоритетную очередь
+-- ...
+-- ogse_signals.get_mgr():unsubscribe(slot_desc) -- отписали
 
 
 local mgr
@@ -328,12 +326,14 @@ function signals_mgr:call( signal_name, ... )
 end
 
 
-local time_limited_cnt = 0
-local time_limited_max = 10
-local work_time_inc    = 10000
-local work_time_limit  = 30000
+local time_limited_cnt   = 0
+local time_limited_delay = 0
+local time_limited_max   = 10
+local work_time_inc      = 10000
+local work_time_limit    = 10000
 
 function signals_mgr:process_call( signal_name, slots, ... )
+  local times     = {}
   local work_time = 0
   -- сперва срабатывают все высокоприоритетные сигналы
   while slots.next_in_normal <= table.getn( slots.normal ) do
@@ -354,6 +354,12 @@ function signals_mgr:process_call( signal_name, slots, ... )
       end
       pt:stop()
       work_time = work_time + pt:time()
+      table.insert(
+        times, {
+          [ "script_name" ] = slot.script_name,
+          [ "time"        ] = pt:time(),
+        }
+      )
       table.remove( self.slots_in_process )
       if slot.timeout then
         slots.reschedule_scheduled = true
@@ -364,7 +370,10 @@ function signals_mgr:process_call( signal_name, slots, ... )
         slots.next_in_normal = slots.next_in_normal + 1
       end
       if slots.time_limited then
-        if work_time >= work_time_limit then
+        if
+          work_time >= work_time_limit
+          and time_limited_delay < time_global()
+        then
           log2(
             "[%s]: signal '%s' time limited in 'normal' queue: %s. Last call spent %s, script_name = %s. Next is %s from %s.",
             script_name(), signal_name, work_time,
@@ -397,10 +406,20 @@ function signals_mgr:process_call( signal_name, slots, ... )
       end
       pt:stop()
       work_time = work_time + pt:time()
+      table.insert(
+        times, {
+          [ "script_name" ] = slot.script_name,
+          [ "time"        ] = pt:time(),
+        }
+      )
       table.remove( self.slots_in_process )
       slots.reschedule_scheduled = true
       slots.next_in_scheduled = slots.next_in_scheduled + 1
-      if slots.time_limited and work_time >= work_time_limit then
+      if
+        slots.time_limited
+        and work_time >= work_time_limit
+        and time_limited_delay < time_global()
+      then
         log2(
           "[%s]: signal '%s' time limited in 'scheduled' queue: %s. Last call spent %s, script_name = %s. Next is %s from %s.",
           script_name(), signal_name, work_time,
@@ -419,6 +438,13 @@ function signals_mgr:process_call( signal_name, slots, ... )
       "[%s]: signal '%s' is too slow: %s",
       script_name(), signal_name, work_time
     )
+    for _, t in ipairs( times ) do
+      if t.time > work_time_limit then
+        log2(
+          "[%s]: %s, %s", script_name(), t.time, tostring( t.script_name )
+        )
+      end
+    end
   end
   if slots.time_limited then
     if time_limited_cnt > time_limited_max then
@@ -439,4 +465,10 @@ function signals_mgr:reschedule( timeout )
   ASSERT( n > 0, "empty slots_in_process table" )
   local slot   = self.slots_in_process[ n ]
   slot.timeout = time_global() + timeout
+end
+
+
+function signals_mgr:delay_time_limit( t )
+  time_limited_delay = time_global() + t
+  log2( "[%s]: time limit functionality paused: %s ms", script_name(), t )
 end
