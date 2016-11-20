@@ -10,9 +10,9 @@ dsh mod для ОП-2
 Основная часть:
 - https://yadi.sk/d/dx4qvrDovYVVr
 
-Последнее обновление 20161112.2325:
-- https://yadi.sk/d/bghukVzbyVGca
-- Зеркало: https://drive.google.com/open?id=0B0h2HnCBW9H1bF84eTRHNXV6N2M
+Последнее обновление 20161120.1139:
+- https://yadi.sk/d/QSRS7ZpPz4MPu
+- Зеркало: https://drive.google.com/open?id=0B0h2HnCBW9H1blZZS3ZHMHB0OXc
 
 
 Важное замечание. Либо играйте так, как я задумал, либо со всеми
