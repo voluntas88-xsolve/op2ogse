@@ -7,10 +7,11 @@ end
 
 function on_first_update()
   local items = {
-    [ "amul_naemn"   ] = this.checking_taken_item48,
-    [ "amulet"       ] = this.checking_taken_item44,
-    -- [ "bullion_gild" ] = this.checking_taken_item50,
-    [ "streyndzher"  ] = this.checking_taken_item58,
+    [ "amul_naemn"     ] = this.checking_taken_item48,
+    [ "amulet"         ] = this.checking_taken_item44,
+    -- [ "bullion_gild"   ] = this.checking_taken_item50,
+    [ "kaktus_izomorf" ] = this.checking_taken_item56,
+    [ "streyndzher"    ] = this.checking_taken_item58,
   }
   for sect, fun in pairs( items ) do
     local obj = db.actor:object( sect )
@@ -29,9 +30,6 @@ function oruzhie_delet()
     function( obj )
       if
         obj:is_scope()
-        or obj:section() == "meceniy_outfit_new"
-        or obj:section() == "hand_teleporter"
-        or obj:section() == "teleportator"
         or spawn_level_changer.teleports[ obj:section() ]
         or ( obj:is_weapon() and get_u32( obj:section(), "slot", 0 ) == 2 )
         or (
@@ -48,8 +46,10 @@ function oruzhie_delet()
             or obj:section() == "wpn_fot"
           )
         )
+        or get_bool( obj:section(), script_name() .. ".oruzhie_delet", false )
       then
-        remove_sects[ obj:section() ] = true
+        remove_sects[ obj:section() ] =
+          ( remove_sects[ obj:section() ] or 0 ) + 1
         return true
       end
       return false
@@ -71,8 +71,8 @@ function oruzhie_delet()
     dsh_rukzak.save_rukzak( new.id, remove_items )
     ogse.save_var( "dsh_rukzak." .. new.id .. ".inv_drop", true )
     ogse.save_var( "dsh_rukzak." .. new.id .. ".zamok",    true )
-    for sect, _ in pairs( remove_sects ) do
-      news_manager.relocate_item( db.actor, "out", sect )
+    for sect, num in pairs( remove_sects ) do
+      news_manager.relocate_item( db.actor, "out", sect, num )
     end
   end
 end
@@ -109,6 +109,19 @@ function bunker_fotik_artu_sms1()
     nil, nil, 20000, nil,
     [[characters_voice\human_03\stalker\talk\labux\labux_45]]
   )
+end
+
+
+-- убираем Шухера с кордона
+function dell_stalk_shuher()
+  for _, n in ipairs({
+    "esc_father_pant", "esc_pantera_bomba", "esc_stalk_shuher"
+  }) do
+    local sobj = alife():object( n )
+    if sobj then
+      alife():release( sobj, true )
+    end
+  end
 end
 
 
@@ -2328,18 +2341,6 @@ function join_freedom (actor, npc)
        db.actor:set_character_community ("freedom", 0, 0)
     end
 --end
---[[ смена репутации отключена
-	if db.actor ~= nil then 
-		db.actor:set_character_community("freedom", 0, 0)
-		local chkgoodwill = relation_registry.community_goodwill("freedom",  db.actor:id())
-		if chkgoodwill < 0 then 
-			chkgoodwill = chkgoodwill + 500
-			relation_registry.set_community_goodwill ("freedom", db.actor:id(), chkgoodwill)
-		else
-			relation_registry.set_community_goodwill ("freedom", db.actor:id(), 500)
-		end
-	end
---]]
 end
 function checking_taken_item50(obj)
 local info=nil
@@ -5944,71 +5945,68 @@ function laba_bul(first_speaker, second_speaker)
         dialogs.relocate_item_section(second_speaker, "af_buliz","in")
     end
 end
-------------------------------------------------------------------------------------------------------------------
-local tabl_laba_v_spiral = { 
-    ["af_armor_1"] = 1,    
-    ["af_cry_1"] = 1,    
-    ["af_dik_1"] = 1,    
-    ["af_kol_1"] = 1,    
-    ["af_pudd_1"] = 1,    
-    ["af_spirit_1"] = 1,    
-    ["af_caterpillar"] = 1 
- }
-local laba_v_spiral_virogdeno_count = 0 -- количество вырожденных артефактов
+
+
+local tabl_laba_v_spiral = {
+  [ "af_armor_1"     ] = 1,
+  [ "af_cry_1"       ] = 1,
+  [ "af_dik_1"       ] = 1,
+  [ "af_kol_1"       ] = 1,
+  [ "af_pudd_1"      ] = 1,
+  [ "af_spirit_1"    ] = 1,
+  [ "af_caterpillar" ] = 1,
+}
 
 --' замена артов в Х-10
 function laba_del_artu()
-    laba_v_spiral_virogdeno_count = 0
-    for a,v in pairs(tabl_laba_v_spiral) do
-        --если вероятность вырождения "сработала"
-        if math_random() < v then
-            --а сколько у ГГ этих артов то ?
-            aCount = 0
-            db.actor:iterate_inventory(function (dummy, vItem)
-                if vItem:section() == a then
-                    aCount = aCount + 1 
-                end 
-            end, nil)
-              --есть такие арты
-            if aCount >= 1 then 
-                sak.out_item_namber(a, 1)
-                laba_v_spiral_virogdeno_count = laba_v_spiral_virogdeno_count + 1
-		break
-            end
-        end
+  for a, v in pairs( tabl_laba_v_spiral ) do
+    -- если вероятность вырождения "сработала"
+    if math_random() < v then
+      -- есть такие арты
+      if amk_utils.inventory_search( a, 1 ) then
+        amk_utils.out_items_number({
+          [ a ] = 1,
+        })
+        break
+      end
     end
+  end
 end
+
+
 --' получим спиральки
-function laba_spir(first_speaker, second_speaker) 
+function laba_spir()
   local sobj = ogse.spawn_item_in_inv( "af_spiral" )
   news_manager.relocate_item( db.actor, "in", sobj:section_name() )
 end
-------------------------------------------------------------------------------------------------------------------
-local tabl_forest_v_izom = { 
-    ["ammo_12x76_zhekan"] = 1
- }
-local forest_v_izom_virogdeno_count = 0 
+
+
+local tabl_forest_v_izom = {
+  [ "ammo_12x76_zhekan" ] = 1,
+}
+local forest_v_izom_virogdeno_count = 0
 
 --' замена патронов в кр. лесу
 function forest_del_pistonu()
-    forest_v_izom_virogdeno_count = 0
-    for a,v in pairs(tabl_forest_v_izom) do
-        if math_random() < v then
-            db.actor:iterate_inventory(function (actor, vItem)
-                if vItem:section() == a then
-                    amk.remove_item_from_inventory(vItem, actor)
-                    forest_v_izom_virogdeno_count = forest_v_izom_virogdeno_count + 1
-                end 
-            end, db.actor)
-        end
+  forest_v_izom_virogdeno_count = 0
+  for a, v in pairs( tabl_forest_v_izom ) do
+    if math_random() < v then
+      local found = amk_utils.out_items({ a })
+      forest_v_izom_virogdeno_count =
+        forest_v_izom_virogdeno_count + found[ a ]
     end
+  end
 end
+
+
 --' получим изоморфные пистоны
-function forest_izom_est(first_speaker, second_speaker) 
-    for i=1,forest_v_izom_virogdeno_count,1 do
-        dialogs.relocate_item_section(second_speaker, "ammo_zhekan_izomorf","in")
-    end
+function forest_izom_est( first_speaker, second_speaker )
+  for i = 1, forest_v_izom_virogdeno_count do
+    dialogs.relocate_item_section( second_speaker, "ammo_zhekan_izomorf", "in" )
+  end
 end
+
+
 --' получим псевдоизоморф кристалл
 function psevdokristall_have(first_speaker, second_speaker)
 dialogs.relocate_item_section(second_speaker, "psevdokristall","in")
@@ -6017,31 +6015,31 @@ end
 --function dell_psevdokristall()
 --sak.out_item_namber("psevdokristall",1)
 --end
-------------------------------------------------------------------------------------------------------------------
-local tabl_mozg_v_izom = { 
-    ["preplastilin"] = 1
- }
-local mozg_v_izom_virogdeno_count = 0 
+
+
+
+local tabl_mozg_v_izom = {
+  [ "preplastilin" ] = 1,
+}
+local mozg_v_izom_virogdeno_count = 0
 
 --' замена препластилина
 function mozg_del_preplastilin()
-    forest_v_izom_virogdeno_count = 0
-    for a,v in pairs(tabl_mozg_v_izom) do
-        if math_random() < v then
-            db.actor:iterate_inventory(function (actor, vItem)
-                if vItem:section() == a then
-                    amk.remove_item_from_inventory(vItem, actor)
-                    mozg_v_izom_virogdeno_count = mozg_v_izom_virogdeno_count + 1
-                end 
-            end, db.actor)
-        end
+  mozg_v_izom_virogdeno_count = 0
+  for a, v in pairs( tabl_mozg_v_izom ) do
+    if math_random() < v then
+      local found = amk_utils.out_items({ a })
+      mozg_v_izom_virogdeno_count = mozg_v_izom_virogdeno_count + found[ a ]
     end
+  end
 end
+
+
 --' получим пластилин
-function mozg_plastilin_est(first_speaker, second_speaker) 
-    for i=1,mozg_v_izom_virogdeno_count,1 do
-        dialogs.relocate_item_section(second_speaker, "izomorf_plastilin","in")
-    end
+function mozg_plastilin_est( first_speaker, second_speaker )
+  for i = 1, mozg_v_izom_virogdeno_count do
+    dialogs.relocate_item_section( second_speaker, "izomorf_plastilin", "in" )
+  end
 end
 
 
@@ -6646,50 +6644,66 @@ dialogs.relocate_item_section(second_speaker, "wpn_eagle_m2","in")
 alife():create("kaktus_izomorf",vector():set(14.118,-0.538,23.657),6732,3215)
 end
 
+
 --' получим фотку мозга
-function fotka_mozga_have(first_speaker, second_speaker)
-if not has_alife_info("fotka_mozga_have") then
-	dialogs.relocate_item_section(second_speaker, "foto_mozg_x16","in")
-	arhara_dialog.foto_mozg_ok_sms()
-	db.actor:give_info_portion("fotka_mozga_have")
+function fotka_mozga_have( first_speaker, second_speaker )
+  if not has_alife_info( "fotka_mozga_have" ) then
+    dialogs.relocate_item_section( second_speaker, "foto_mozg_x16","in" )
+    arhara_dialog.foto_mozg_ok_sms()
+    for _, info in ipairs({
+      "fotka_mozga_have",
+      "yantar_kontroller_yazva_spawn",
+      "spawn_chernomor_zombyk",
+    }) do
+      db.actor:give_info_portion( info )
+    end
+  end
 end
-end
+
 
 --' ГГ друг зомбарей
-function drug_psss(actor, npc)
-if db.actor ~= nil then
-db.actor:set_character_community("stranger", 0, 0)
-local chkgoodwill = relation_registry.community_goodwill("zombied", db.actor:id())
-if chkgoodwill < 0 then 
-chkgoodwill = chkgoodwill + 6000
-relation_registry.set_community_goodwill ("zombied", db.actor:id(), chkgoodwill)
-else
-relation_registry.set_community_goodwill ("zombied", db.actor:id(), 6000)
-db.actor:give_info_portion("xvatit_uzhe")
-end
-end
-end
-function checking_taken_item56(obj)
-local info=nil
-if not has_alife_info("xvatit_uzhe") then
-if obj:section()=="kaktus_izomorf" then drug_psss(obj)
-end
-end
+function drug_psss()
+  db.actor:set_character_community( "stranger", 0, 0 )
+  local chkgoodwill = relation_registry.community_goodwill(
+    "zombied", db.actor:id()
+  )
+  if chkgoodwill < 0 then 
+    chkgoodwill = chkgoodwill + 6000
+    relation_registry.set_community_goodwill (
+      "zombied", db.actor:id(), chkgoodwill
+    )
+  else
+    relation_registry.set_community_goodwill( "zombied", db.actor:id(), 6000 )
+    db.actor:give_info_portion( "xvatit_uzhe" )
+  end
 end
 
+
+function checking_taken_item56( obj )
+  if not has_alife_info( "xvatit_uzhe" ) then
+    if obj:section() == "kaktus_izomorf" then drug_psss() end
+  end
+end
+
+
 --' ГГ враг зомбарей
-function vrag_zombie(actor, npc)
-if db.actor ~= nil then
-db.actor:set_character_community("stalker", 0, 0)
-local chkgoodwill = relation_registry.community_goodwill("zombied", db.actor:id())
-if chkgoodwill > 0 then 
-chkgoodwill = chkgoodwill - 6100
-relation_registry.set_community_goodwill ("zombied", db.actor:id(), chkgoodwill)
-else
-relation_registry.set_community_goodwill ("zombied", db.actor:id(), - 6100)
+function vrag_zombie()
+  db.actor:set_character_community( "stalker", 0, 0 )
+  local chkgoodwill = relation_registry.community_goodwill(
+    "zombied", db.actor:id()
+  )
+  if chkgoodwill > 0 then 
+    chkgoodwill = chkgoodwill - 6100
+    relation_registry.set_community_goodwill(
+      "zombied", db.actor:id(), chkgoodwill
+    )
+  else
+    relation_registry.set_community_goodwill(
+      "zombied", db.actor:id(), -6100
+    )
+  end
 end
-end
-end
+
 
 --' убираем foto_monolitovets
 function dell_foto_monolitovets()
@@ -6821,17 +6835,34 @@ function antiz_otdal()
 sak.out_item_namber("antizombie",2)
   end
 
+
 --' убираем Черномора-зомби
 function dell_chernomor_zombi()
-local se_obj = alife():object("chernomor_zombi")
+  local se_obj = alife():object( "chernomor_zombi" )
   if se_obj then
-    alife():release(se_obj, true)
+    alife():release( se_obj, true )
   end
-local se_obj = alife():object("chernomor_zombi1")
+  local se_obj = alife():object( "chernomor_zombi1" )
   if se_obj then
-    alife():release(se_obj, true)
+    alife():release( se_obj, true )
+  end
+  local se_obj = alife():story_object( 9626 )
+  if se_obj then
+    alife():release( se_obj, true )
+  else
+    for id, is_npc in pairs( db.creature ) do
+      local obj = level.object_by_id( id )
+      if obj:section() == "chernomor_zombi1" then
+        local sobj = alife():object( obj:id() )
+        if sobj then
+          alife():release( sobj )
+        end
+        break
+      end
+    end
   end
 end
+
 
 --' изоморфы Черномора
 function spawn_izomorfy_chernom()
@@ -6981,36 +7012,47 @@ local se_obj = alife():object("piyan_psevdoabakan")
   end
 end
 
+
 --' мины для Пантеры на Кордоне
-function spawn_bomba_i_mina()
-local obj = alife():create("bomba_mina_b",vector():set(-227.875,-28.802,-222.302),26467,40)
---local obj = alife():create("bomba_mina_b",vector():set(-229.103,-28.649,-222.109),25818,40)
-local obj = alife():create("explosive_bomba",vector():set(-228.545,-28.910,-223.067),26466,40)
+function spawn_bomba_i_mina1()
+  alife():create(
+    "explosive_bomba",
+    vector():set( -228.545, -28.910, -223.067 ), 26466, 40
+  )
 end
+
+function spawn_bomba_i_mina2()
+  alife():create(
+    "bomba_mina_b",
+    vector():set( -227.875, -28.802, -222.302 ), 26467, 40
+  )
+end
+
 
 --' убираем Пантеру с Кордона
 function dell_esc_pantera()
-local se_obj = alife():object("esc_pantera_bomba")
+  local se_obj = alife():object( "esc_pantera_bomba" )
   if se_obj then
-    alife():release(se_obj, true)
+    alife():release( se_obj, true )
   end
 end
 
-function sound_deaf_pantera(sound_name)
-if sound_name then
-if snd_obj and snd_obj:playing() then
-snd_obj:stop()
+
+function sound_deaf_pantera( sound_name )
+  if sound_name then
+    local snd_obj = xr_sound.get_safe_sound_object(
+      [[characters_voice\scenario\arhara_kordon\po_snegu]]
+    )
+    if snd_obj then
+      snd_obj:play_no_feedback( db.actor, sound_object.s2d, 0, vector(), 1.0 )
+    else
+      log1( "load ~~~ ЗВУК НЕ НАЙДЕН: " .. sound_name )
+    end
+  else
+    log1( "load ~~~ ЗВУК НЕ ЗАДАН" )
+  end
 end
-snd_obj = xr_sound.get_safe_sound_object([[characters_voice\scenario\arhara_kordon\po_snegu]])
-if snd_obj then
-snd_obj:play_no_feedback(db.actor, sound_object.s2d, 0, vector(), 1.0)
-else
-get_console():execute("load ~~~ ЗВУК НЕ НАЙДЕН: "..sound_name)
-end
-else
-get_console():execute("load ~~~ ЗВУК НЕ ЗАДАН")
-end
-end
+
 
 function proba_posulki()
 local obj = alife():create("af_drops",vector():set(-255.655,-23.377,-134.334),7894,5)
@@ -7027,16 +7069,12 @@ function sp_ploti_svalka()
     "flesh_strong", vector():set( -236.463, -1.910, 171.242 ), 13329, 343
   )
   alife():create(
-    "wpn_desert_eagle",
+    "mutant_wpn_desert_eagle",
     habr.position, habr.m_level_vertex_id, habr.m_game_vertex_id, habr.id
   )
   alife():create(
     "pisma_stalka",
     habr.position, habr.m_level_vertex_id, habr.m_game_vertex_id, habr.id
-  )
-  alife():create_ammo(
-    "ammo_11.43x23_hydro",
-    habr.position, habr.m_level_vertex_id, habr.m_game_vertex_id, habr.id, 20
   )
   dsh.create_free_monster(
     "flesh_strong", vector():set( -236.463, -1.910, 171.242 ), 13329, 343
@@ -7165,14 +7203,6 @@ end
 function militar_tushk()
 local obj = alife():create("tushkano_normal",vector():set(-51.788,-10.182,21.075),257887,1607)
 local obj = alife():create("tushkano_strong",vector():set(-51.788,-10.182,21.075),257887,1607)
-end
-
---' убираем Шухера с кордона
-function dell_stalk_shuher()
-local se_obj = alife():object("esc_stalk_shuher")
-  if se_obj then
-    alife():release(se_obj, true)
-  end
 end
 
 --' проверим наличие фотки убийцы с Милитари
@@ -8045,27 +8075,19 @@ local obj = alife():create("imitator",vector():set(-94.969078063965,-1.824152469
 local obj = alife():create("imitator",vector():set(-95.195724487305,-1.8241112232208,-19.7877368927),248713,3620)
 end
 
-function pantera_dinamit_nevid (actor, npc)
-    local source = nil
-    local sim = alife ()
-    if sim then
-       local se_obj = sim:story_object (17048)  
-       if se_obj then
-          source = level.object_by_id(se_obj.id)
-       end
+
+function pantera_dinamit_nevid( actor, npc )
+  sobj = alife():create( alife():spawn_id( story_ids.esc_dinamit_panera ) )
+  level.client_spawn_manager():add(
+    sobj.id, -1, function( id, obj )
+      obj:explode()
+      local pantera = level_object_by_sid( story_ids.esc_pantera_bomba )
+      if pantera then pantera:kill( obj ) end
+      dsh.timeout( 500, this.spawn_bomba_i_mina2 )
     end
-    if source == nil then
-        return
-    end
-    local h = hit ()
-    h.power = 200
-    h.direction = vector():set( 1, 0, 0 )
-    h.impulse = 60
-    h.draftsman = source
-    h.type = hit.chemical_burn
---  h.type = hit.fire_wound
-    source:hit (h)
+  )
 end
+
 
 --' Ара, паразит, подох раньше времени - будет вылет
 function delete_khutor_zone2_restrictor()
@@ -8296,27 +8318,29 @@ end
 
 
 function nax_poshel()
-local se_obj = alife():object("chernomor_zombi")
+  local se_obj = alife():object( "chernomor_zombi" )
   if se_obj then
-    alife():release(se_obj, true)
+    alife():release( se_obj, true )
   end
 end
 
 
 --' убираем Черномора-зомби
 function dell_chernomor_zombi1()
-local se_obj = alife():object("chernomor_zombi1")
+  local se_obj = alife():object( "chernomor_zombi1" )
   if se_obj then
-    alife():release(se_obj, true)
+    alife():release( se_obj, true )
   end
 end
+
+
 function del_chern_zombi1()
-local sim = alife()
-	local se_obj = sim:story_object(9626)
-	if se_obj then
-		sim:release(se_obj, true)
-	end
+  local se_obj = alife():story_object( 9626 )
+  if se_obj then
+    alife():release( se_obj, true )
+  end
 end
+
 
 function dell_stanki()
 --[[ Cтанки удалять больше не нужно, у них поправлен конфиг в алспауне и из-за них больше в МГ не вылетает

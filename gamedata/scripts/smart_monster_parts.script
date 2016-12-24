@@ -336,6 +336,10 @@ function spawn_parts_for_actor( obj, number )
             if art then
               local sect = get_string( art, script_name() .. ".create_item" )
               ASSERT( sect, "create_item not found for %s", art )
+              local prop = amk_utils.get_item_props( sect )
+              if prop.has_af_dyn then
+                sect = amk_anoms.make_dyn_art_sect( sect )
+              end
               spawn_part_in_inv( obj, sect )
             end
           end
@@ -354,10 +358,8 @@ function on_take( obj )
     if sobj then
       alife():release( sobj, true )
     end
-    sobj = ogse.spawn_item_in_inv( sect )
-    if sobj then
-      dsh.mark_art_as_handmade( sobj, false )
-    end
+    local prop = amk_utils.get_item_props( sect )
+    sobj = ogse.spawn_item_in_inv( prop.af_bio_sect or sect )
     return true
   end
 end
@@ -383,7 +385,7 @@ function transfer_everything( from_obj, to_obj )
   from_obj:iterate_inventory(
     function( obj, item )
       local s_obj = alife():object( item:id() )
-      if s_obj then
+      if s_obj and not watcher_act.do_not_touch( item ) then
         table.insert( items, item )
       end
     end,

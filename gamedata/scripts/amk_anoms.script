@@ -1709,12 +1709,13 @@ function init()
   end
   forbidden_pos = {}
   if blow > 0 and blow < 4 then return end
-  -- Не менять аномалии в Госпитале, пока не сварен Камень Удачи. Иначе
-  -- удаляется та аномалия, в которой он должен вариться и все, тупик.
+  -- Не менять аномалии в Госпитале, пока не сварен Камень Удачи и не оживлена
+  -- Муха. Иначе удаляются те аномалии, которые нужны для этого дела и все,
+  -- тупик.
   if
     lname == "hospital"
     and db.actor:has_info( "spawnim_3otsek" )
-    and not db.actor:has_info( "spawn_kamen_udachy" )
+    and not db.actor:has_info( "spawn_hospit_live" )
   then
     return
   end
@@ -2045,11 +2046,16 @@ function generate_art( lname, section, pre_check_coords_func )
   if pos then
     local sobj
     if section then
+      local prop = amk_utils.get_item_props( section )
+      if prop.has_af_dyn then
+        section = make_dyn_art_sect( section )
+        prop    = amk_utils.get_item_props( section )
+      end
+      if prop.af_bio_sect then section = prop.af_bio_sect end
       sobj = spawn_art( section, pos, new_gv, new_lv )
     else
       sobj = spawn_rand_arts( pos, new_gv, new_lv, lname )
     end
-    dsh.mark_art_as_handmade( sobj, false )
     table.insert( forbidden_pos, pos )
     return sobj
   end
@@ -2157,7 +2163,14 @@ end
 
 
 function spawn_rand_arts( pos, gv, lv, lname )
-  return spawn_art( get_random_art_sect( lname ), pos, gv, lv )
+  local sect = get_random_art_sect( lname )
+  local prop = amk_utils.get_item_props( sect )
+  if prop.has_af_dyn then
+    sect = make_dyn_art_sect( sect )
+    prop = amk_utils.get_item_props( sect )
+  end
+  if prop.af_bio_sect then sect = prop.af_bio_sect end
+  return spawn_art( sect, pos, gv, lv )
 end
 
 
@@ -2599,4 +2612,24 @@ function get_anomaly_list_for_pos( posn, radius )
     end
   end
   return ret
+end
+
+
+function make_dyn_art_sect( sect )
+  local suff
+  local arts_dyn = dsh.get_next_random(
+    script_name() .. ".make_dyn_art_sect", 21
+  )
+  if arts_dyn     >=  1 and arts_dyn <=  3 then
+    suff = "_dyn1d"
+  elseif arts_dyn >=  4 and arts_dyn <=  9 then
+    suff = "_dyn2d"
+  elseif arts_dyn >= 10 and arts_dyn <= 16 then
+    suff = "_dyn3d"
+  elseif arts_dyn >= 17 and arts_dyn <= 20 then
+    suff = "_dyn4d"
+  else
+    suff = "_dyn5d"
+  end
+  return sect .. suff
 end

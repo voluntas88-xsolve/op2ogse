@@ -3,16 +3,21 @@
 function attach( sm )
   sm:subscribe({ signal = "on_drop_before_all", fun = this.lose_item })
   sm:subscribe({ signal = "on_item_to_ruck",    fun = this.get_item  })
-  sm:subscribe({ signal = "on_item_to_belt",    fun = this.on_item_to_belt })
+  sm:subscribe({ signal = "on_spawn",           fun = this.on_spawn  })
 end
 
 
-function on_item_to_belt( obj )
-  if device().precache_frame < 1 then
-    lose_item( obj )
-  end
+function on_spawn()
+  dsh.exec_on_update(
+    function()
+      local sm = ogse_signals.get_mgr()
+      sm:subscribe({ signal = "on_item_to_belt", fun = this.lose_item })
+    end
+  )
 end
 
+
+local registered = {}
 
 function lose_item( obj )
   local obj_id    = obj:id()
@@ -28,7 +33,10 @@ function lose_item( obj )
   elseif                        -- 39
     obj_clsid == clsid.artefact and dsh.is_artefact( obj_sect )
   then
-    arc_arts.register_artefact( obj_sect, -1 )
+    if registered[ obj_id ] then
+      arc_arts.register_artefact( obj_sect, -1 )
+      registered[ obj_id ] = nil
+    end
   elseif
     string.find( obj_sect, "arc_art_box_", 1, true )
     and not has_alife_info( "biznes_remove_special_item" )
@@ -67,7 +75,10 @@ function get_item( obj )
   elseif                        -- 39
     obj_clsid == clsid.artefact and dsh.is_artefact( obj_sect )
   then
-    arc_arts.register_artefact( obj_sect, 1 )
+    if not registered[ obj_id ] then
+      arc_arts.register_artefact( obj_sect, 1 )
+      registered[ obj_id ] = true
+    end
   elseif obj_sect == "arc_art_box_basic" then
     arc_containers.register_container( obj_id, obj_sect )
   elseif obj_sect == "arc_art_box_8basic" then

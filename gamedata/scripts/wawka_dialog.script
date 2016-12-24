@@ -48,7 +48,6 @@ local nagrad = {
     "af_armor_1",
   },
   level_5 = {
-    "af_caterpillar",
     "af_cry_2",
     "af_babka_2",
     "af_dik_2",
@@ -405,7 +404,7 @@ function find_good_wpn()
   local items = {}
   db.actor:iterate_inventory(
     function( npc, item )
-      if item:is_weapon() then
+      if item:is_weapon() and db.actor:is_in_ruck( item ) then
         local sect = item:section()
         if need_weapon[ sect ] and item:condition() > v_wpn_cond then
           if items[ sect ] then
@@ -641,14 +640,12 @@ end
 -- оружие нужно выкладывать в нычку.
 function good_item_have_number( itm_section, need_number, check_cond_f )
   if not sak.have_item_namber( itm_section, need_number ) then return false end
-  local cnt, cnt_good = 0, 0
-  db.actor:iterate_inventory(
-    function( actor, item )
-      if item:section() == itm_section then
-        cnt = cnt + 1
-      end
-    end,
-    db.actor
+  local cnt = 0
+  amk_utils.inventory_iterate_section(
+    itm_section,
+    function( item )
+      cnt = cnt + 1
+    end
   )
   if
     ( cnt >= need_number )
@@ -1012,5 +1009,9 @@ function get_rnd_nagrad( level )
       script_name() .. ".get_rnd_nagrad", table.getn( level )
     )
   ]
+  local prop = amk_utils.get_item_props( item )
+  if prop.has_af_dyn then
+    item = amk_anoms.make_dyn_art_sect( item )
+  end
   return item
 end

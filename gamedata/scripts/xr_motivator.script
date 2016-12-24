@@ -670,10 +670,6 @@ function motivator_binder:net_destroy()
     )
   end
 
-  -- added by xStream for AMK miniSDK
-  amk.on_npc_go_offline( self.object )
-  -- end of addition
-
   self.am:call( "on_npc_net_destroy", self.object, self )
   self.am:cleanup_signal_subs( "on_npc_update." .. self.object:id() )
   event( "npc_net_destroy" ):trigger({ victim = self.object })
@@ -919,7 +915,6 @@ function motivator_binder:death_callback( victim, who )
 
   -- added by xStream for AMK miniSDK
   amk.on_death( victim, who )
-  amk_utils.npc_death( victim, who )
   -- end of addition
 
   self:clear_callbacks()

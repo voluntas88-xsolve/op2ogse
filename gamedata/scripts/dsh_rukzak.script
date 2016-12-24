@@ -42,7 +42,9 @@ end
 
 
 function spawn_magic_rukzak( sect )
-  if ui_mm_opt_main.GetOption( "magic_rukzak_enabled" ) then
+  if dsh_cfg.get_data().magic_rukzak_off then
+    news_main.create_treasurebox()
+  else
     local real = get_string( sect, "real_item_section" )
     local pos  = db.actor:position()
     local new  = alife():create(
@@ -50,8 +52,6 @@ function spawn_magic_rukzak( sect )
     )
     local zamok = "dsh_rukzak." .. new.id .. ".zamok"
     ogse.save_var( zamok, false )
-  else
-    news_main.create_treasurebox()
   end
 end
 
@@ -377,8 +377,7 @@ function blowout_modif_arts()
       for _, item in ipairs( items ) do
         if
           arts[ item.section ]
-          and
-          table.getn( arts[ item.section ].next ) < 2
+          and table.getn( arts[ item.section ].next ) < 2
         then
           -- Вырождаются модификаты последнего или предпоследнего уровня
           if item.condition >= 1 then
@@ -1610,19 +1609,24 @@ function ui_rukzak:get_item_description( item )
     end
   end
   if dsh.is_artefact( sect ) then
-    local handmade = true
-    if item.info then
+    local prop     = amk_utils.get_item_props( sect )
+    local handmade = get_bool(
+      sect, "bind_det_arts.handmade", ( not prop.is_af_bio )
+    )
+    if handmade and item.info then
       local ini = create_ini_file( item.info )
       if ini:section_exist( "dsh" ) then
         handmade = ( get_bool( "dsh", "handmade", nil, ini ) ~= false )
       end
     end
-    local cost, af_text
+    if not ( handmade or prop.is_af_bio ) then
+      if prop.af_bio_sect then sect = prop.af_bio_sect end
+    end
+    local cost = get_float( sect, "cost", 0 ) * ( item.condition / 100 )
+    local af_text
     if handmade then
-      cost = dsh.get_handmade_cost( sect )
-      af_text = "%c[default]Похоже, этот артефакт дорого не продать.\\n"
+      af_text = "%c[default]На этот артефакт точно ничего выменять не получится.\\n"
     else
-      cost = get_u32( sect, "cost" )
       af_text = "%c[default]Пожалуй, этот артефакт имеет некоторую ценность.\\n"
     end
     if cost then

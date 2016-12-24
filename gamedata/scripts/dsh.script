@@ -3,6 +3,7 @@ local mobs_smart_terrain = {}
 
 function attach( sm )
   sm:subscribe({ signal = "on_before_spawn", fun = this.on_before_spawn })
+  sm:subscribe({ signal = "on_destroy",      fun = this.on_destroy      })
   sm:subscribe({ signal = "on_save",         fun = this.on_save         })
 end
 
@@ -131,18 +132,16 @@ end
 
 
 -- http://www.amk-team.ru/forum/index.php?showtopic=6458&p=937442
---[=[
-
-local lname = level.name()
-local lvtab = GetLevelVertexes( lname )
-local lvx = math.max( unpack( lvtab ) )
-local lv  = math_random( 1, lvx )
-
-local gvtab  = GetGameVertexes( lname )
-local gv_min = math.min( unpack( gvtab ) )
-local gv_max = math.max( unpack( gvtab ) )
-
---]=]
+--
+-- local lname = level.name()
+-- local lvtab = GetLevelVertexes( lname )
+-- local lvx = math.max( unpack( lvtab ) )
+-- local lv  = math_random( 1, lvx )
+--
+-- local gvtab  = GetGameVertexes( lname )
+-- local gv_min = math.min( unpack( gvtab ) )
+-- local gv_max = math.max( unpack( gvtab ) )
+--
 function GetLevelVertexes( level )
   local lvtab ={}
   local i = 0
@@ -295,8 +294,11 @@ function get_art_levels()
       local af_prev = table.remove( process, 1 )
       ASSERT( af ~= af_prev, "loop found: %s == %s", af, af_prev )
       if arts[ af_prev ] then
-        for _, k in ipairs( next_arts ) do
-          table.insert( arts[ af_prev ].next, k )
+        if table.getn( arts[ af_prev ].next ) < table.getn( next_arts ) then
+          arts[ af_prev ].next = {}
+          for _, k in ipairs( next_arts ) do
+            table.insert( arts[ af_prev ].next, k )
+          end
         end
         table.insert( next_arts, 1, af_prev )
         table.insert( process,   arts[ af_prev ].prev[ 1 ] )
@@ -378,11 +380,8 @@ end
 
 function is_zone_bio_art( obj )
   local props = db.artefacts[ obj:id() ]
-  if ( not props ) or props.handmade then
-    return false
-  else
-    return true
-  end
+  ASSERT( props, "not found in db.artefacts: %s", obj:name() )
+  return not props.handmade
 end
 
 
@@ -445,26 +444,22 @@ end
 
 
 function actor_get_art_nl0( n )
-  local l0_arts = {}
+  local arts = {}
   for k, v in pairs( get_art_levels() ) do
     if table.getn( v.prev ) == 1 and table.getn( v.next ) > 0 then
-      l0_arts[ v.prev[ 1 ] ] = true
+      amk_utils.inventory_iterate_section(
+        v.prev[ 1 ],
+        function( obj )
+          if db.actor:is_in_ruck( obj ) then
+            table.insert( arts, obj )
+            if table.getn( arts ) == n then return true end
+          end
+        end
+      )
+      if table.getn( arts ) == n then break end
     end
   end
-  local arts = {}
-  db.actor:iterate_inventory(
-    function( npc, obj )
-      if l0_arts[ obj:section() ] then
-        if db.actor:is_in_ruck( obj ) then
-          table.insert( arts, obj )
-        end
-      end
-    end,
-    db.actor
-  )
-  if table.getn( arts ) >= n then
-    return arts
-  end
+  if table.getn( arts ) == n then return arts end
 end
 
 function actor_has_art_nl0( n )
@@ -551,15 +546,19 @@ end
 
 
 function actor_get_art_check( f )
-  local arts = get_art_levels()
-  for i = 0, db.actor:object_count() - 1 do
-    local obj  = db.actor:object( i )
-    local sect = obj:section()
-    if arts[ sect ] and f( arts[ sect ] ) then
-      if db.actor:is_in_ruck( obj ) then return obj end
-    end
+  for k, v in pairs( get_art_levels() ) do
+    local found
+    amk_utils.inventory_iterate_section(
+      k,
+      function( obj )
+        if f( v ) and db.actor:is_in_ruck( obj ) then
+          found = obj
+          return true
+        end
+      end
+    )
+    if found then return found end
   end
-  return nil
 end
 
 function actor_get_art_abs()
@@ -637,6 +636,10 @@ function spawn_arts_for_kalinin()
   }
   local radius = 200
   for _, sect in ipairs( arts ) do
+    local prop = amk_utils.get_item_props( sect )
+    if prop.has_af_dyn then
+      sect = amk_anoms.make_dyn_art_sect( sect )
+    end
     local sobj
     while not sobj do
       sobj = amk_anoms.generate_art(
@@ -857,7 +860,7 @@ end
 
 -- Проверка, могут ли мутанты на АС начинать рейд на Барьер. Нужна для
 -- того, что бы нападение начиналось не раньше, чем игрок дойдет до
--- Барьера.  С увеличенным алайфом все это начинается слишком рано.
+-- Барьера. С увеличенным алайфом все это начинается слишком рано.
 function lets_mil_monster_begin()
   return gulag_distance_to_actor_lt( "mil_monster", 250 )
 end
@@ -941,6 +944,19 @@ end
 function begin_af_transform( d, h, m, t )
   local result = {}
   for k, v in pairs( t.result ) do
+    if dsh.is_artefact( k ) and not t.remove_anomaly then
+      local prop = amk_utils.get_item_props( k )
+      if prop.has_af_dyn then
+        local rand_goods = math.floor(
+          math.log( handmade_arts_cnt() / 1.7 )
+        ) + 1
+        if rand_goods > 5 then rand_goods = 5 end
+        local rand_dyn = get_next_random(
+          script_name() .. ".begin_af_transform.rand_dyn", rand_goods
+        )
+        k = k .. "_dyn" .. rnd .. "d"
+      end
+    end
     table.insert( result, k )
   end
   local from_komp = {}
@@ -1003,21 +1019,18 @@ function end_af_transform( result, udacha, x, y, z, gv, lv, info, komp, rm_anom,
   else
     t.komp = {}
   end
+  local rand_goods = math.floor( math.log( handmade_arts_cnt() / 1.7 ) )
+  if rand_goods > 4 then rand_goods = 4 end
   local sobj = amk_mod.af_transform_universal_end( t )
   if sobj and udacha and not rm_anom then
     local pk = get_netpk( sobj, 1 )
     if pk:isOk() then
-      local data = pk:get()
-      local cond = data.condition
-      local step = ( 1 + level.get_game_difficulty() ) / 10
-      local rnd  = get_next_random(
-        script_name() .. ".end_af_transform.rnd"
-      )
-      cond = cond - rnd * step
-      local cnt = ogse.load_var(
+      local cnt  = ogse.load_var(
         script_name() .. ".begin_af_transform.cnt", 1
       )
-      data.condition = cond / cnt
+      local rnd  = get_next_random( script_name() .. ".end_af_transform.rnd" )
+      local data = pk:get()
+      data.condition = ( rand_goods * 0.2 + rnd * 0.2 ) / cnt
       pk:set( data )
     end
   end
@@ -1116,13 +1129,9 @@ end
 
 
 function map_remove_treasure_inv( sect )
-  db.actor:iterate_inventory(
-    function( npc, item )
-      if item:section() == sect then
-        map_remove_treasure( item:id() )
-      end
-    end,
-    db.actor
+  amk_utils.inventory_iterate_section(
+    sect,
+    function( obj ) map_remove_treasure( obj:id() ) end
   )
 end
 
@@ -1222,10 +1231,7 @@ function blowout_modif_arts()
         local p_sobj = alife():object( sobj.parent_id )
         if
           p_sobj and IsStalker( p_sobj )
-          and p_sobj.spawner
-          and xr_logic.pick_section_from_condlist(
-            db.actor, p_sobj, p_sobj.spawner
-          ) == nil
+          and ( not p_sobj:can_be_spawned() )
         then
           -- если неписю еще не разрешено выходить в онлайн, то и нечего
           -- модифицировать его артефакты. Вот так и достается нам с
@@ -1382,28 +1388,31 @@ end
 
 
 function find_capsule()
-  local obj = db.actor:object( "af_capsule" )
-  if not obj then
-    db.actor:iterate_inventory(
-      function( npc, item )
-        if not obj and item:section() == "arc_art_box_1basic" then
-          local idx  = arc_1containers.get_inv_index( item:id() )
-          local arts = arc_1containers.get_inv_container_arts( idx )
-          for _, n in pairs( arts ) do
-            if n > 0 then
-              local sect = arc_arts.get_art_section( n )
-              if sect == "af_capsule" then
-                obj = item
-                break
-              end
+  local res, t = amk_utils.inventory_search_check({
+    [ "af_capsule" ] = 1,
+  })
+  if res then
+    return t[ 1 ]
+  else
+    local found
+    amk_utils.inventory_iterate_section(
+      "arc_art_box_1basic",
+      function( item )
+        local idx  = arc_1containers.get_inv_index( item:id() )
+        local arts = arc_1containers.get_inv_container_arts( idx )
+        for _, n in pairs( arts ) do
+          if n > 0 then
+            local sect = arc_arts.get_art_section( n )
+            if sect == "af_capsule" then
+              found = item
+              return true
             end
           end
         end
-      end,
-      db.actor
+      end
     )
+    return found
   end
-  return obj
 end
 
 function have_capsule()
@@ -1475,9 +1484,9 @@ function add_art_capsule()
     script_name() .. ".add_art_capsule.rnd", table.getn( possible_arts )
   )
   local sect = possible_arts[ rnd ]
-  local sobj = ogse.spawn_item_in_inv( sect )
-  mark_art_as_handmade( sobj, false )
-  news_manager.relocate_item( db.actor, "in",  sect )
+  local prop = amk_utils.get_item_props( sect )
+  local sobj = ogse.spawn_item_in_inv( prop.af_bio_sect or sect )
+  news_manager.relocate_item( db.actor, "in", sect )
 end
 
 
@@ -1565,6 +1574,12 @@ function has_trade_dialog_sidor()
 end
 function on_trade_dialog_sidor()
   return dec_trade_dialog_cnt( "sidor" )
+end
+function hasnt_trade_dialog_sidor()
+  return not has_trade_dialog( "sidor" )
+end
+function trade_sidor_say_later()
+  trade_say_come_later( "sidor" )
 end
 
 function has_trade_dialog_barman()
@@ -1700,19 +1715,16 @@ end
 
 function actor_get_art_bio( sect, n )
   local arts = {}
-  db.actor:iterate_inventory(
-    function( npc, obj )
-      if obj:section() == sect and is_zone_bio_art( obj ) then
-        if db.actor:is_in_ruck( obj ) then
-          table.insert( arts, obj )
-        end
+  amk_utils.inventory_iterate_section(
+    sect,
+    function( obj )
+      if is_zone_bio_art( obj ) and db.actor:is_in_ruck( obj ) then
+        table.insert( arts, obj )
+        if table.getn( arts ) == n then return true end
       end
-    end,
-    db.actor
+    end
   )
-  if table.getn( arts ) >= n then
-    return arts
-  end
+  if table.getn( arts ) == n then return arts end
 end
 
 function actor_has_art_bio( sect, n )
@@ -1797,9 +1809,13 @@ end
 
 
 function is_handmade_artefact( sobj )
-  local handmade = true
+  local sect     = sobj:section_name()
+  local prop     = amk_utils.get_item_props( sect )
+  local handmade = get_bool(
+    sect, "bind_det_arts.handmade", ( not prop.is_af_bio )
+  )
   local ini = sobj:spawn_ini()
-  if ini and ini:section_exist( "dsh" ) then
+  if handmade and ini and ini:section_exist( "dsh" ) then
     handmade = ( get_bool( "dsh", "handmade", nil, ini ) ~= false )
   end
   return handmade
@@ -1884,13 +1900,13 @@ end
 
 function find_ekza_akkumul_discharged()
   local items = {}
-  db.actor:iterate_inventory(
-    function( npc, item )
-      if item:section() == "ekza_akkumul" and item:condition() < 1 then
+  amk_utils.inventory_iterate_section(
+    "ekza_akkumul",
+    function( item )
+      if db.actor:is_in_ruck( item ) and item:condition() < 1 then
         table.insert( items, item )
       end
-    end,
-    db.actor
+    end
   )
   table.sort(
     items, function( a, b ) return a:condition() < b:condition() end
@@ -1929,6 +1945,9 @@ function shuffle( array )
 end
 
 
+local cached_condlist_hit  = 0
+local cached_condlist_miss = 0
+
 class "cached_condlist"
 function cached_condlist:__init( parsed, ttl )
   self.parsed = parsed
@@ -1941,6 +1960,80 @@ function cached_condlist:pick_section_from_condlist( actor, npc )
       actor, npc, self.parsed
     )
     self.cached_time = time_global() + self.ttl
+    cached_condlist_miss = cached_condlist_miss + 1
+  else
+    cached_condlist_hit  = cached_condlist_hit  + 1
   end
   return self.cached_res
+end
+
+
+function on_destroy()
+  log2(
+    "[%s]: cached_condlist stats ( hit/miss ): %s / %s",
+    script_name(), cached_condlist_hit, cached_condlist_miss
+  )
+end
+
+
+function make_pantera_alive()
+  local sobj = alife():create( 2228 ) -- hos_new_panterka
+  ASSERT( sobj, "can't create hos_new_panterka" )
+  local pk = get_netpk( sobj, 1 )
+  ASSERT( pk:isOk(), "can't read netpacket of %s", sobj:name() )
+  local data = pk:get()
+  data.custom_data:setString(
+    "[smart_terrains]\n"
+    .. "none = true\n" ..
+    "[logic]\n"
+    .. "cfg = dsh\\logic\\pantera_is_alive.ltx\n"
+  )
+  pk:set( data )
+end
+
+
+function sms_otez_pantera_alive_run()
+  local sobj = alife():object( "hos_new_panterka" )
+  if sobj then
+    ogse_st_mgr.start_timer(
+      script_name() .. ".sms_otez_pantera_alive",
+      10,
+      script_name() .. ".sms_otez_pantera_alive"
+    )
+  end
+end
+
+function sms_otez_pantera_alive()
+  news_manager.send_tip(
+    db.actor,
+    "%c[255,160,160,160]" .. "ОТЕЦ ПАНТЕРЫ:\\n"
+      .. "%c[255,255,128,128]Стрелок, Пантера жива! Она в Госпитале и я иду к ней. Мы пробудем там, пока Пантера не придет в себя.",
+    nil, nil, 25000
+  )
+end
+
+
+function get_current_outfit_protection( hit )
+  if not db.actor:get_current_outfit() then return 0 end
+  return db.actor:get_current_outfit_protection( hit )
+end
+
+
+function akim_hog_sms()
+  news_manager.send_tip(
+    db.actor,
+    "%c[255,160,160,160]".."АКИМ:\\n"
+      .. "%c[255,255,128,128]Стрелок, тут за воротами, на Свалке, какой-то сталкер чудной. Хогом его зовут. Небылицы разные рассказывает, но думаю, тебя это может заинтересовать.\n",
+    nil, nil, 25000
+  )
+end
+
+
+function handmade_arts_cnt( inc )
+  local cnt = ogse.load_var( script_name() .. ".handmade_arts_cnt", 0 )
+  if inc then
+    cnt = cnt + inc
+    ogse.save_var( script_name() .. ".handmade_arts_cnt", cnt, "u32" )
+  end
+  return cnt
 end

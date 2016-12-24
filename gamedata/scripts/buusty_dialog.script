@@ -2036,24 +2036,83 @@ function spawn_buusty_nychka()
 	alife():create("pri_arhara_naemnik2",vector():set(12.869419152222,23.926837921143,-167.23930358887),735058,3722)
 end
 
+
 --заспавним сосок после поднятия кейса
 function spawn_sosychi_kpp()
-	dsh.create_free_monster("bloodsucker_weak",vector():set(34.00072479248,24.11314201355,-178.70581054688),771837,3722)
-	dsh.create_free_monster("bloodsucker_strong",vector():set(34.00076479248,24.11314201355,-178.70581054688),771837,3722)
-	dsh.create_free_monster("bloodsucker_effector",vector():set(56.625213623047,24.16229057312,-180.41625976563),811452,3727)
-	dsh.create_free_monster("bloodsucker_weak",vector():set(56.625253623047,24.16229057312,-180.41625976563),811452,3727)
-	dsh.create_free_monster("bloodsucker_strong",vector():set(55.718879699707,27.962440490723,-179.93096923828),810227,3727)
-	dsh.create_free_monster("bloodsucker_mil",vector():set(55.718883699707,27.962440490723,-179.93096923828),810227,3727)
-	dsh.create_free_monster("bloodsucker_weak",vector():set(49.322830200195,25.962839126587,-204.28302001953),798130,3727)
-	alife():create("af_black_angel",vector():set(49.322830200195,25.962839126587,-204.28302801953),798130,3727)
-	dsh.create_free_monster("bloodsucker_strong",vector():set(68.312004089355,24.15193939209,-194.76936340332),832148,3727)
-	dsh.create_free_monster("bloodsucker_weak",vector():set(68.312064089355,24.15193939209,-194.76936340332),832148,3727)
-	dsh.create_free_monster("bloodsucker_strong",vector():set(34.448276519775,23.98766708374,-202.6337890625),771816,3727)
-	dsh.create_free_monster("bloodsucker_hell",vector():set(34.448236519775,23.98766708374,-202.6337890625),771816,3727)
-	dsh.create_free_monster("bloodsucker_hell",vector():set(12.869459152222,23.926837921143,-167.23930358887),735058,3722)
-	dsh.create_free_monster("bloodsucker_weak",vector():set(12.869419152222,23.926837921143,-167.23930358887),735058,3722)
-	dsh.create_free_monster("controller_babka",vector():set(456.80087280275,31.177732467651,-449.84228515625),1438950,3745)
+  if db.actor:has_info( "buusty_kvest_have" ) then return end
+  dsh.create_free_monster(
+    "bloodsucker_weak",
+    vector():set( 34.00072479248, 24.11314201355, -178.70581054688 ),
+    771837, 3722
+  )
+  dsh.create_free_monster(
+    "bloodsucker_strong",
+    vector():set( 34.00076479248, 24.11314201355, -178.70581054688 ),
+    771837, 3722
+  )
+  dsh.create_free_monster(
+    "bloodsucker_effector",
+    vector():set( 56.625213623047, 24.16229057312, -180.41625976563),
+    811452, 3727
+  )
+  dsh.create_free_monster(
+    "bloodsucker_weak",
+    vector():set( 56.625253623047, 24.16229057312, -180.41625976563 ),
+    811452, 3727
+  )
+  dsh.create_free_monster(
+    "bloodsucker_strong",
+    vector():set( 55.718879699707, 27.962440490723, -179.93096923828 ),
+    810227, 3727
+  )
+  dsh.create_free_monster(
+    "bloodsucker_mil",
+    vector():set( 55.718883699707, 27.962440490723, -179.93096923828 ),
+    810227, 3727
+  )
+  dsh.create_free_monster(
+    "bloodsucker_weak",
+    vector():set( 49.322830200195, 25.962839126587, -204.28302001953 ),
+    798130, 3727
+  )
+  alife():create(
+    "af_black_angel",
+    vector():set( 49.322830200195, 25.962839126587, -204.28302801953 ),
+    798130, 3727
+  )
+  dsh.create_free_monster(
+    "bloodsucker_strong",
+    vector():set( 68.312004089355, 24.15193939209, -194.76936340332 ),
+    832148, 3727
+  )
+  dsh.create_free_monster(
+    "bloodsucker_weak",
+    vector():set( 68.312064089355, 24.15193939209, -194.76936340332 ),
+    832148, 3727
+  )
+  dsh.create_free_monster(
+    "bloodsucker_strong",
+    vector():set( 34.448276519775, 23.98766708374, -202.6337890625 ),
+    771816, 3727
+  )
+  dsh.create_free_monster(
+    "bloodsucker_hell",
+    vector():set( 34.448236519775, 23.98766708374, -202.6337890625 ),
+    771816, 3727
+  )
+  dsh.create_free_monster(
+    "bloodsucker_hell",
+    vector():set( 12.869459152222, 23.926837921143, -167.23930358887 ),
+    735058, 3722
+  )
+  dsh.create_free_monster(
+    "bloodsucker_weak",
+    vector():set( 12.869419152222, 23.926837921143, -167.23930358887 ),
+    735058, 3722
+  )
+  db.actor:give_info_portion( "buusty_kvest_have" )
 end
+
 
 --проверка Кейса с деньгами в рюкзаке
 function buusty_case_have()
@@ -2093,35 +2152,6 @@ function voyaki_zasada_krot()
   alife():create("zasada_tonnel_agro_1",vector():set(173.28457641602,14.353455543518,74.499938964844),394398,571)
   alife():create("zasada_tonnel_agro_3",vector():set(173.28457041602,14.353455543518,74.499938964844),394398,571)
 end
-
---[=[
--- заспавним вояк рестриктором/квест на пда Крота полностью переделан/теперь спавнятся другие нпс, с другой логикой
-function voyaki_zasada_krot()
-	alife():create("specnaz_krot",vector():set(186.826705,-0.201501,45.180316),401476,497)
-	alife():create("specnaz_krot1",vector():set(186.834609,-0.051360,42.492485),401468,497)
-	alife():create("specnaz_krot2",vector():set(186.649719,-0.052315,47.830894),401482,497)
-	alife():create("specnaz_krot3",vector():set(192.187606,-0.200329,50.678466),404209,498)
-	alife():create("specnaz_krot4",vector():set(192.028533,-0.201355,40.794651),403854,498)
-	alife():create("specnaz_krot5",vector():set(179.082839,-0.147831,40.521095),397455,497)
-	alife():create("specnaz_krot6",vector():set(162.979034,0.152220,52.858772),388296,497)
-	alife():create("specnaz_krot7",vector():set(186.685974,-0.200296,49.601230),401488,497)
-	alife():create("specnaz_krot8",vector():set(186.873138,-0.200149,40.763748),401462,497)
-	alife():create("specnaz_krot9",vector():set(185.974136,-0.200525,39.422603),401103,497)
-	alife():create("specnaz_krot10",vector():set(185.515106,-0.202115,50.918235),400771,497)
-	alife():create("specnaz_krot11",vector():set(161.140899,0.224522,27.616004),387017,584)
---	alife():create("zasada_tonnel_agro_1",vector():set(129.24006652832,14.142509460449,64.829223632813),362855,495)
---	alife():create("zasada_tonnel_agro_1",vector():set(154.9340057373,0.77566540241241,56.555809020996),383001,496)
---	alife():create("zasada_tonnel_agro_2",vector():set(154.9340457373,0.77566540241241,56.555809020996),383001,496)
---	alife():create("zasada_tonnel_agro_3",vector():set(158.73202514648,0.18168100714684,28.545803070068),385706,584)
---	alife():create("zasada_tonnel_agro_2",vector():set(158.73202814648,0.18168100714684,28.545803070068),385706,584)
---	alife():create("zasada_tonnel_agro_1",vector():set(184.9469909668,8.1175870895386,49.892147064209),400407,500)
---	alife():create("zasada_tonnel_agro_3",vector():set(184.9469929668,8.1175870895386,49.892147064209),400407,500)
---	alife():create("zasada_tonnel_agro_2",vector():set(184.9469969668,8.1175870895386,49.892147064209),400407,500)
---	alife():create("zasada_tonnel_agro_1",vector():set(173.28457641602,14.353455543518,74.499938964844),394398,571)
---	alife():create("zasada_tonnel_agro_3",vector():set(173.28457041602,14.353455543518,74.499938964844),394398,571)
-end
---]=]
-
 
 -- проверим, все ли мы собрали для Витька
 function voron_prichindaly_have()
@@ -2464,48 +2494,70 @@ dialogs.relocate_item_section(second_speaker, "ammo_7.92x33_ap","in")
 dialogs.relocate_item_section(second_speaker, "ammo_7.92x33_ap","in")
 end
 
+
 function bolota_nechist_spawn()
-battle.show_must_go_on_real( "marsh", 2, 1 )
---	dsh.create_free_monster("snork_strong",vector():set(-72.049018859863,0.28703537583351,459.21771240234),84074,3371)
---	dsh.create_free_monster("flesh_strong",vector():set(-72.049018859863,0.28703537583351,459.21771240234),84074,3371)
---	dsh.create_free_monster("snork_stronger",vector():set(-72.049018859863,0.28703537583351,459.21771240234),84074,3371)
---	dsh.create_free_monster("flesh_swamp",vector():set(-72.049018859863,0.28703537583351,459.21771240234),84074,3371)
-	dsh.create_free_monster("snork_nosach",vector():set(-96.160827636719,0.71701657772064,466.53240966797),84074,3371)
-	dsh.create_free_monster("snork_jumper",vector():set(-96.160827636719,0.71701657772064,466.53240966797),84074,3371)
-	dsh.create_free_monster("snork_strong",vector():set(-96.160827636719,0.71701657772064,466.53240966797),84074,3371)
---	dsh.create_free_monster("snork_jumper",vector():set(-96.160827636719,0.71701657772064,466.53240966797),84074,3371)
---	dsh.create_free_monster("snork_strong",vector():set(-96.160827636719,0.71701657772064,466.53240966797),84074,3371)
---	dsh.create_free_monster("snork_jumper",vector():set(-84.387863,11.367486,515.975402),84074,3371)
---	dsh.create_free_monster("zombie_hell",vector():set(-84.387863,11.367486,515.975402),84074,3371)
---	dsh.create_free_monster("zombie_hell2",vector():set(-84.387863,11.367486,515.975402),84074,3371)
---	dsh.create_free_monster("zombie_immortal",vector():set(-84.387863,11.367486,515.975402),84074,3371)
---	dsh.create_free_monster("zombie_hell4",vector():set(-121.703498,0.592941,434.568359),83563,3371)
-	dsh.create_free_monster("snork_strong",vector():set(-121.703498,0.592941,434.568359),83563,3371)
-	dsh.create_free_monster("flesh_swamp",vector():set(-121.703498,0.592941,434.568359),83563,3371)
---	dsh.create_free_monster("snork_strong",vector():set(-121.703498,0.592941,434.568359),83563,3371)
-	dsh.create_free_monster("snork_stronger",vector():set(-167.043609,1.000747,456.849609),83312,3371)
-	dsh.create_free_monster("snork_nosach",vector():set(-167.043609,1.000747,456.849609),83312,3371)
---	dsh.create_free_monster("snork_strong",vector():set(-167.043609,1.000747,456.849609),83312,3371)
-	dsh.create_free_monster("flesh_swamp",vector():set(-167.043609,1.000747,456.849609),83312,3371)
-	dsh.create_free_monster("flesh_strong",vector():set(-200.172546,2.349969,476.436981),83312,3371)
---	dsh.create_free_monster("snork_strong",vector():set(-200.172546,2.349969,476.436981),83312,3371)
-	dsh.create_free_monster("zombie_immortal",vector():set(-200.172546,2.349969,476.436981),83312,3371)
---	dsh.create_free_monster("snork_strong",vector():set(-200.172546,2.349969,476.436981),83312,3371)
-	dsh.create_free_monster("snork_jumper",vector():set(-219.240463,0.909182,467.175720),83312,3371)
---	dsh.create_free_monster("snork_strong",vector():set(-219.240463,0.909182,467.175720),83312,3371)
-	dsh.create_free_monster("zombie_hell6",vector():set(-219.240463,0.909182,467.175720),83312,3371)
---	dsh.create_free_monster("snork_jumper",vector():set(-219.240463,0.909182,467.175720),83312,3371)
-	dsh.create_free_monster("zombie_hell7",vector():set(-210.783081,4.017982,497.823547),83312,3371)
---	dsh.create_free_monster("snork_jumper",vector():set(-210.783081,4.017982,497.823547),83312,3371)
---	dsh.create_free_monster("zombie_hell1",vector():set(-210.783081,4.017982,497.823547),83312,3371)
-	dsh.create_free_monster("snork_stronger",vector():set(-218.624191,2.487556,521.702514),83312,3371)
---	dsh.create_free_monster("snork_jumper",vector():set(-218.624191,2.487556,521.702514),83312,3371)
-	dsh.create_free_monster("bloodsucker_mil",vector():set(-218.624191,2.487556,521.702514),83312,3371)
---	dsh.create_free_monster("zombie_hell2",vector():set(-38.786617,1.050388,435.695373),120685,3393)
-	dsh.create_free_monster("zombie_hell3",vector():set(-38.786617,1.050388,435.695373),120685,3393)
---	dsh.create_free_monster("zombie_hell4",vector():set(-38.786617,1.050388,435.695373),120685,3393)
-	dsh.create_free_monster("zombie_hell5",vector():set(-38.786617,1.050388,435.695373),120685,3393)
+  battle.show_must_go_on_real( "marsh", 2, 1 )
+  dsh.create_free_monster(
+    "snork_nosach",
+    vector():set( -96.160827636719, 0.71701657772064, 466.53240966797 ),
+    84074, 3371
+  )
+  dsh.create_free_monster(
+    "snork_jumper",
+    vector():set( -96.160827636719, 0.71701657772064, 466.53240966797 ),
+    84074, 3371
+  )
+  dsh.create_free_monster(
+    "snork_strong",
+    vector():set( -96.160827636719, 0.71701657772064, 466.53240966797 ),
+    84074, 3371
+  )
+  dsh.create_free_monster(
+    "snork_strong", vector():set( -121.703498, 0.592941, 434.568359 ),
+    83563, 3371
+  )
+  dsh.create_free_monster(
+    "flesh_swamp",
+    vector():set( -121.703498, 0.592941, 434.568359 ),
+    83563, 3371
+  )
+  dsh.create_free_monster(
+    "snork_stronger",
+    vector():set( -167.043609, 1.000747, 456.849609 ),
+    83312, 3371
+  )
+  dsh.create_free_monster(
+    "snork_nosach",
+    vector():set( -167.043609, 1.000747, 456.849609 ),
+    83312, 3371
+  )
+  dsh.create_free_monster(
+    "flesh_swamp",
+    vector():set( -167.043609, 1.000747, 456.849609 ),
+    83312, 3371
+  )
+  dsh.create_free_monster(
+    "flesh_strong",
+    vector():set( -200.172546, 2.349969, 476.436981 ),
+    83312, 3371
+  )
+  dsh.create_free_monster(
+    "snork_jumper",
+    vector():set( -219.240463, 0.909182, 467.175720 ),
+    83312, 3371
+  )
+  dsh.create_free_monster(
+    "snork_stronger",
+    vector():set( -218.624191, 2.487556, 521.702514 ),
+    83312, 3371
+  )
+  dsh.create_free_monster(
+    "bloodsucker_mil",
+    vector():set( -218.624191, 2.487556, 521.702514 ),
+    83312, 3371
+  )
 end
+
 
 --' спавним мертвого Сашко и раненного Петровича в пещерке на болотах рестриктором
 function sahko_petrovich_spawn()
@@ -2592,9 +2644,15 @@ function petrovich_dal_box(first_speaker, second_speaker)
 dialogs.relocate_item_section(second_speaker, "box_alexandrych","in")
 end
 
+
 --спавним Александрыча
 function alexandrych_spawn()
-	alife():create("stalker_alexandrych",vector():set(-155.71984863281,0.81847321987152,87.442039489746),67186,3379)
+  local sobj = alife():create(
+    "stalker_alexandrych",
+    vector():set( -155.71984863281, 0.81847321987152, 87.442039489746 ),
+    67186, 3379
+  )
+  amk.add_spot_on_map( sobj.id, "crlc_big", "Александрыч" )
 end
 
 --ставим метку на Александрыча
@@ -3480,34 +3538,39 @@ function computer_new_have()
 return buusty_dialog.item_much("computer_new",1) ~= false 
 end
 
+
 -- Восстанавливаем ХО у Василия
 function xo_repair_have()
-	return 
-		wawka_dialog.good_item_have_number("fake_wpn_knife_n",1) and
-		wawka_dialog.good_item_have_number("fake_wpn_knife_new",1) and
-		wawka_dialog.good_item_have_number("fake_wpn_elf",1) and 
-		new_dialog.item_much("af_dummy_spring_red",1) and
-		new_dialog.item_much("mutant_deathclaw_antler",1) and
-		db.actor:money() >= 30000 and
-		db.actor:item_in_slot(0)
+  return
+    amk_utils.good_items_have_number({
+      [ "fake_wpn_knife_n"   ] = 1,
+      [ "fake_wpn_knife_new" ] = 1,
+      [ "fake_wpn_elf"       ] = 1,
+    })
+    and new_dialog.item_much( "af_dummy_spring_red", 1 )
+    and new_dialog.item_much( "mutant_deathclaw_antler", 1 )
+    and db.actor:money() >= 30000
+    and db.actor:item_in_slot( 0 )
 end
 
+
 function xo_repair_start()
-	local wpn = db.actor:item_in_slot(0):section()
-	
-	db.actor:give_info_portion("biznes_remove_special_item")
-	sak.out_item_namber(wpn,1)
-	sak.out_item_namber("fake_wpn_knife_n",1)
-	sak.out_item_namber("fake_wpn_knife_new",1)
-	sak.out_item_namber("fake_wpn_elf",1)
-	sak.out_item_namber("af_dummy_spring_red",1)
-	sak.out_item_namber("mutant_deathclaw_antler",1)
-	aem_manager.manage_money(30000, "out")
-	db.actor:disable_info_portion("biznes_remove_special_item")
-	
-	amk.save_variable("xo_sec", wpn)
-	amk.save_variable("xo_rep", amk.game_hours()+math.random(20, 24))
+  local wpn = db.actor:item_in_slot( 0 ):section()
+  db.actor:give_info_portion( "biznes_remove_special_item" )
+  sak.out_item_namber( wpn, 1 )
+  amk_utils.out_good_items_number({
+    [ "fake_wpn_knife_n"   ] = 1,
+    [ "fake_wpn_knife_new" ] = 1,
+    [ "fake_wpn_elf"       ] = 1,
+  })
+  sak.out_item_namber( "af_dummy_spring_red", 1 )
+  sak.out_item_namber( "mutant_deathclaw_antler", 1 )
+  aem_manager.manage_money( 30000, "out" )
+  db.actor:disable_info_portion( "biznes_remove_special_item" )
+  amk.save_variable( "xo_sec", wpn )
+  amk.save_variable( "xo_rep", amk.game_hours() + math.random( 20, 24 ) )
 end
+
 
 -- проверка примерно раз в 3 игровых минуты
 function xo_repair_finished()

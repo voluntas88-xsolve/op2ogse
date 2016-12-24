@@ -833,6 +833,8 @@ inv_grid_x         = 68
 inv_grid_y         = 53
 eat_portions_num = 1
 
+arhara_dialog.oruzhie_delet = true
+
 [pampers]:arhara_obman1
 inv_name           = pampers
 inv_name_short     = pampers
@@ -2933,7 +2935,7 @@ inv_weight			= 0.5
 
 inv_grid_x			= 8
 inv_grid_y			= 50
-cost				     = 17000
+cost				     = 170
 jump_height			= 0.0
 
 particles			    = anomaly2\gravity_damage_01_smoke
@@ -2952,8 +2954,8 @@ bleeding_restore_speed            = 0.0
 hit_absorbation_sect              = af_eye_voron_absorbation
 
 art_hit.art_hit = 0.5, 0.3, telepatic
+dsh.af_bio_sect = af_eye_voron.af_bio
 smart_monster_parts.create_item = mutant_af_eye_voron
-
 
 [af_eye_voron_absorbation]
 burn_immunity                     = 0.80				;коэффициенты иммунитета 
@@ -2965,6 +2967,12 @@ telepatic_immunity                = 1.1
 chemical_burn_immunity            = 0.90
 explosion_immunity                = 1.0
 fire_wound_immunity               = 1.07
+
+
+[af_eye_voron.af_bio]:af_eye_voron
+cost          = 17000
+dsh.af_base   = af_eye_voron
+dsh.is_af_bio = true
 
 
 [mutant_af_eye_voron]:af_eye_voron,mutant_af_base
@@ -3568,7 +3576,7 @@ inv_weight			= 1.0
 inv_grid_x			= 23
 inv_grid_y			= 7
 
-cost				     = 18000
+cost				     = 600
 
 jump_height			= .3
 
@@ -3589,7 +3597,9 @@ power_restore_speed              = 0.001
 bleeding_restore_speed           = 0.0
 
 hit_absorbation_sect             = af_babka_4_absorbation
+
 art_hit.art_hit = 1.3, 0.3, radiation
+dsh.af_bio_sect = af_babka_4.af_bio
 
 [af_babka_4_absorbation]
 burn_immunity                    = 1.0				;коэффициенты иммунитета 
@@ -3601,6 +3611,12 @@ telepatic_immunity               = 1.0
 chemical_burn_immunity           = 1.1
 explosion_immunity               = 0.89
 fire_wound_immunity              = 0.87
+
+
+[af_babka_4.af_bio]:af_babka_4
+cost          = 60000
+dsh.af_base   = af_babka_4
+dsh.is_af_bio = true
 
 
 [video_kasseta]:identity_immunities
@@ -4370,7 +4386,7 @@ fire_wound_immunity             = 1.0
 
 
 
-[forest_last_dead_listok]:identity_immunities
+[forest_last_dead_listok]:identity_immunities,dsh_bad_item
 GroupControlSection	= spawn_group
 discovery_dependency = 
 $spawn 				= "arhara_items\forest_last_dead_listok"
@@ -5389,6 +5405,9 @@ inv_grid_height		= 1
 inv_grid_x			= 18
 inv_grid_y			= 35
 cost				= 100
+
+bind_stalker.on_take_call = buusty_dialog.spawn_sosychi_kpp
+watcher_act.bad_item      = true
 
 [af_phantom]:af_base
 GroupControlSection	        = spawn_group

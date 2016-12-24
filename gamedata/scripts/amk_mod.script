@@ -350,32 +350,6 @@ function check_spawn()
         if amk.load_variable("blowout",0)>0 then amk.save_variable("weather",level.get_weather()) end
         level.set_weather("amk_for_blow",true)
         game.start_tutorial("restore_sun")
-
---[[
-        if amk.load_variable("blowout",0)>0 and amk.load_variable("blowout",0)<4 then
-                local bt=blowout_type()
-                level.add_cam_effector("camera_effects\\earthquake.anm", 2002, true, "")
-                if bt<1 then
-                        level.set_weather("amk_for_blow",true)
-                        level.add_pp_effector("vibros.ppe", 2001, true)
-                        blowout_psy_sound("start")
-                end
-        end
-]]
-
-        if db.actor and not has_alife_info("game_over") then
-                local flame = db.actor:object("wpn_flame")
-                if flame then
-                        db.actor:iterate_inventory(
-                                function(dummy,item)
-                                        if item:section()=="wpn_flame" then
-                                                alife():release(alife():object(item:id()))
-                                        end
-                                end
-                                ,db.actor)
-                        
-                end
-        end
 end
 
 function restore_sun()
@@ -543,11 +517,10 @@ function item_transform( obj_id, lv, gv )
 end
 
 
---'*******************************************************************************
---'   **   **   **   **   **    **   **   **      AF_TRANSFORM         **   **   **   **   **    **   **   **
---'*******************************************************************************
-local cur_level=nil
-local havegoodart=false
+--'*****************************************************************************
+--'   **   **   **   **   **    **   **   **      AF_TRANSFORM
+--'*****************************************************************************
+local cur_level, havegoodart
 
 
 -- проверка на упавший предмет/артефакт
@@ -555,8 +528,9 @@ function check_for_af_drop( obj )
   if not level.get_inventory_wnd():IsShown() then return end
   local obj_sect = obj:section()
   -- проверка не один ли это из компонентов
-  if afs[ obj_sect ] == true then
-    local anom_id, anom_pos, anom_radius, dist = amk_anoms.get_nearest_anomaly( obj )
+  if is_komponent( obj_sect ) then
+    local anom_id, anom_pos, anom_radius, dist =
+      amk_anoms.get_nearest_anomaly( obj )
     if anom_id and anom_radius - dist > -2 then
       local a_obj = level.object_by_id( anom_id )
       local lv    = a_obj:level_vertex_id()
@@ -606,9 +580,19 @@ end
 
 -- проверка: является ли компонентом для варки
 -- параметр - название секции
-function is_komponent(sec)
-     return (afs[sec] ~= nil)
+function is_komponent( sect, recept )
+  if not recept then recept = afs end
+  local t    = { sect }
+  local prop = amk_utils.get_item_props( sect )
+  if prop.af_base then
+    table.insert( t, prop.af_base )
+  end
+  for _, aka in ipairs( t ) do
+    return recept[ sect ] == true
+  end
+  return false
 end
+
 
 -- возвра ает значение, возможно из умолчаний
 function get_af_transform_param(name, recept, recepti)
@@ -666,14 +650,17 @@ function check_af_transform( af, af_sect, obj_pos, anom_id, anom_sect, anom_pos,
   local finish = false -- флаг для вvхода из циклов
   for anom, recepti in pairs( anom_recept_komp[ "anomalii" ] ) do
     --нашли в списке аномалиі, возле которой стоим
-    if string.find( anom_sect, anom ) ~= nil then
+    if string.find( anom_sect, anom ) then
       -- рецептv в наличии у ++, в которvх участвует даннvй компонент
       local recepti_est     = {}
       local recept_podhodit = false
       -- собираем рецептv, в которvх участвует даннvй компонент
       for info, recept in pairs( recepti[ "recepti" ] ) do
         --есть рецепт и этот компонент в нїм участвует
-        if db.actor:has_info( info ) and recept[ "komp" ][ af_sect ] == true then
+        if
+          db.actor:has_info( info )
+          and is_komponent( af_sect, recept[ "komp" ] )
+        then
           recept_podhodit = true
           -- копируем рецепт
           recepti_est[ info ] = {}
@@ -699,22 +686,21 @@ function check_af_transform( af, af_sect, obj_pos, anom_id, anom_sect, anom_pos,
       end
       -- если нашли хоть один имеіийся подходяий рецепт
       if recept_podhodit then
-        --ием рядом другие компонентv если находим их в вvбраннvх
+        --и рядом другие компонентv если находим их в вvбраннvх
         --рецептах, то удаляем их из рецептов как только какой-то
         --рецепт остаїтся без компонентов - рецепт сработал
         for i = 1, 65534 do
           local obj = level.object_by_id( i )
-          if obj and alife():object( i ) then
+          if obj and alife():object( i ) and not obj:parent() then
             local dist = obj:position():distance_to( anom_pos )
             if
-              obj:parent() == nil
-              and ( anom_radius - obj:position():distance_to( anom_pos ) ) > -2
+              ( anom_radius - obj:position():distance_to( anom_pos ) ) > -2
             then
               local obj_sect = obj:section()
               --проверяем отобраннvе рецептv
               for info, recept in pairs( recepti_est ) do
                 -- если компонент есть в рецепте
-                if recepti_est[ info ][ "komp" ][ obj_sect ] == true then
+                if is_komponent( obj_sect, recepti_est[ info ][ "komp" ] ) then
                   -- добавляем L- компонента для буду его удаления из игрv
                   recepti_est[ info ][ "komp" ][ obj_sect ] = obj:id()
                   -- уменьшаем количество компонентов в рецепте
@@ -770,7 +756,7 @@ function check_af_transform( af, af_sect, obj_pos, anom_id, anom_sect, anom_pos,
                     )
                     -- удаляем из игрv компонентv рецепта
                     db.actor:give_info_portion( "biznes_remove_special_item" )
-                    for k,v in pairs( komp ) do
+                    for k, v in pairs( komp ) do
                       alife():release( alife():object( v ) )
                     end
                     db.actor:disable_info_portion( "biznes_remove_special_item" )
@@ -896,8 +882,11 @@ function af_transform_universal_end( params )
         game.translate_string( "trans_finished_title" )
           .. " из %c[255,255,0,0]" .. table.concat( from_komp, ", " )
       )
-      if params.udacha and string.find( k, "^af_" ) then
-        archievements.acv_count_event( "acv_art", 100, "Сварщик" )
+      if dsh.is_artefact( k ) then
+        dsh.handmade_arts_cnt( 1 )
+        if params.udacha then
+          archievements.acv_count_event( "acv_art", 100, "Сварщик" )
+        end
       end
     end
     amk.send_tip(
@@ -1078,14 +1067,6 @@ if game_options.run_blowout_pp == 1 then
 end
 
 function start_blow_timer()
---[[
-local basis = game_options.blow_time_basis
-local shift = game_options.blow_time_shift
---local resuls = basis + (math_random()*shift) - (shift/2)
-local resuls = basis+math_random(-shift, shift)
-amk.g_start_timer("blow_shift", 0, 0, resuls)
-if (news_main and news_main.next_blow) then news_main.next_blow(resuls) end
-]]
 end
 
 function Blowout_pp(phase)
@@ -1795,28 +1776,6 @@ function repair_armor(val)
         end
 end
 
---[[
-function dezombify(id,v)
-        local npc=level.object_by_id(id)
-        if npc then
-                if npc:alive()==false then
-                        return true
-                end
-                local sobj=alife():object(id)
-                if sobj then
-                        npc:set_character_community(v.comm,0,0)
-                        npc:set_goodwill(v.gw,db.actor)
-                        local orgtbl=amk.read_stalker_params(sobj)
-                        orgtbl.profile=string.gsub(orgtbl.profile,"(.*)_zombi","%1")
-                        -- amk.mylog("dezombified "..npc:name().." profile "..orgtbl.profile)
-                        amk.write_stalker_params(orgtbl,sobj)
-                        return true
-                end    
-        end
-        return false
-end
-]]
-
 btrs_friends={}
 
 function build_btrs_table(obj)
@@ -1938,20 +1897,4 @@ end
 
 function fake_weapon (st)
 monnoroch.fake_weapon (st)
-end
-
-function firebat_ammo() -- see dsh_remove_ammo.script
-
---      local ammo=db.actor:object("ammo_flame") -- фикс перезарядок огнемета Шурупа и Шмеля
-        local ammo=db.actor:object("ammo_rpo-a")
-        if ammo then
-                db.actor:iterate_inventory(
-                        function(dummy,item)
---                              if item:section()=="ammo_flame" then -- фикс перезарядок огнемета Шурупа и Шмеля
-                                if item:section()=="ammo_rpo-a" then
-                                        alife():release(alife():object(item:id()))
-                                end
-                        end
-                        , db.actor)
-        end
 end

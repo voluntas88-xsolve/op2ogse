@@ -1653,6 +1653,10 @@ function isWeapon (object, class_id)
 	local id = class_id or get_clsid(object)
 	return IAmAWeapon[id] == true
 end
+function isWeaponGrenade( object, class_id )
+  local id = class_id or get_clsid( object )
+  return IAmAGrenade[ id ] == true
+end
 function isWeaponFireOnly(object)
 local clsid_weapon_fireonly = {
     [clsid.wpn_ak74_s]              = true,
@@ -1675,7 +1679,8 @@ local clsid_weapon_fireonly = {
 }
     return (object and clsid_weapon_fireonly[object:clsid()])
 end
-IAmAWeapon = {}
+IAmAWeapon  = {}
+IAmAGrenade = {}
 function IAmAWeaponInit()
     IAmAWeapon = {
 		[clsid.wpn_ak74_s]              = true,
@@ -1699,6 +1704,10 @@ function IAmAWeaponInit()
 		[clsid.wpn_vintorez_s]          = true,
 		[clsid.wpn_walther_s]           = true
     }
+  IAmAGrenade = {
+    [ clsid.wpn_grenade_f1   ] = true,
+    [ clsid.wpn_grenade_rgd5 ] = true,
+  }
 end
 IAmAWeaponFireOnly = {}
 function IAmAWeaponFireOnlyInit()
@@ -2463,7 +2472,6 @@ function start_game_callback()
 
   --AMK UTILS--
   amk.on_game_start(obj)
-  amk_utils.start_game()
   --AMK UTILS--
 
   m_netpk.attach() -- инициализация модуля m_netpk
@@ -2886,6 +2894,9 @@ function set_overweight_jump_k( v )
   db.actor:set_actor_condition_float( nil, v, 300 )
 end
 
+function set_stand_power( v )
+  db.actor:set_actor_condition_float( nil, v, 280 )
+end
 function set_walk_power( v )
   db.actor:set_actor_condition_float( nil, v, 284 )
 end
@@ -3222,8 +3233,6 @@ end
 
 function mark_grenade_non_pickable(id, item)
 	set_item_forbidden_to_actor(item)
-	log1("!!DEBUG_GRENKA_NONPICKABLE "..tostring(id))
-	--level.client_spawn_manager():remove(id, 0)
 end
 
 -- вспомогательная функция для установки флагов в классе CInventoryItem

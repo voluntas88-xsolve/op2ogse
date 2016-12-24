@@ -4,6 +4,7 @@
 -- например те, у которых имя модуля не начинается на ogse
 addons = {
   "dsh_cfg",
+  "amk_utils",
   "smart_monster_parts",
   "amk",
   "amk_mod",
@@ -13,14 +14,13 @@ addons = {
   "ogse_st_mgr",
   "ogse_qt",
   "inventory",
-  "ogse_night_vision",
   "dsh_babah_proxy",
   "dsh_def_video_settings",
   "dsh_remove_ammo",
   "dsh_grenade_flash",
   "dsh_hotkeys_proxy",
   "dsh_restore_active_slot",
-  "dsh_move_all_items",
+  -- "dsh_move_all_items",
   "dsh_zamok_proxy",
   "ogse_sleep_mgr",
   "dsh_sleep",
@@ -40,6 +40,7 @@ addons = {
   "dsh_hand_teleporter",
   "dsh_arc_proxy",
   "dsh_acumm",
+  "ogse_night_vision",
 --  "dsh_2p",
 --  "dsh_health_fx",
   "dsh_hud_fx",
@@ -117,6 +118,7 @@ addons = {
   "dsh_inv_colors",
   "netpacket_pda_binder",
   "flamethrower",
+  "dsh_bone_protection",
 
   -- "dsh_memuse",
 }

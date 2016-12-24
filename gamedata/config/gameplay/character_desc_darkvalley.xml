@@ -36,7 +36,7 @@
 		<actor_dialog>akill_borov</actor_dialog>
 		<actor_dialog>koloda_borov</actor_dialog>
 		<actor_dialog>borov_peremirie</actor_dialog>
-		<actor_dialog>fonarik_borov</actor_dialog>
+		<!-- <actor_dialog>fonarik_borov</actor_dialog> -->
 		<actor_dialog>borov_reid_start</actor_dialog>
 		<actor_dialog>borov_reid_done</actor_dialog>
 <!--		<actor_dialog>borov_bottle_start</actor_dialog>-->
@@ -415,7 +415,7 @@
 		<crouch_type>1</crouch_type>
 		<supplies>
 			[spawn] \n
-			wpn_m4super90 \n
+			wpn_vepr \n
 			ammo_12x76_zhekan = 1 \n
 			device_torch \n
                         wpn_tt33 \n
@@ -485,7 +485,7 @@
                         ammo_7.62x25_p \n
 			device_torch \n
                         wpn_ba5short \n
-                        ammo_12x70_buck \n
+                        ammo_12x70_kart \n
 #include "gameplay\character_food.xml"
 #include "gameplay\character_drugs.xml"
 		</supplies>

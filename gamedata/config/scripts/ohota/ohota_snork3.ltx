@@ -1,0 +1,10 @@
+; -*- mode: conf-windows; coding: windows-1251-dos -*-
+[smart_terrains]
+none = true
+
+[logic]
+active = scheme
+on_death = death@cat
+
+[death@cat]
+on_info = {=killed_by_arbalet} %+ohota_cat3_dead%, %+ohota_cat1_fail%
