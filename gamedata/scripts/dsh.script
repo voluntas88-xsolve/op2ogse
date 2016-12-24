@@ -954,7 +954,7 @@ function begin_af_transform( d, h, m, t )
         local rand_dyn = get_next_random(
           script_name() .. ".begin_af_transform.rand_dyn", rand_goods
         )
-        k = k .. "_dyn" .. rnd .. "d"
+        k = k .. "_dyn" .. rand_dyn .. "d"
       end
     end
     table.insert( result, k )
@@ -1997,7 +1997,7 @@ function sms_otez_pantera_alive_run()
   if sobj then
     ogse_st_mgr.start_timer(
       script_name() .. ".sms_otez_pantera_alive",
-      10,
+      30,
       script_name() .. ".sms_otez_pantera_alive"
     )
   end
@@ -2007,7 +2007,7 @@ function sms_otez_pantera_alive()
   news_manager.send_tip(
     db.actor,
     "%c[255,160,160,160]" .. "ОТЕЦ ПАНТЕРЫ:\\n"
-      .. "%c[255,255,128,128]Стрелок, Пантера жива! Она в Госпитале и я иду к ней. Мы пробудем там, пока Пантера не придет в себя.",
+      .. "%c[255,255,128,128]Стрелок, она жива! Пантера жива! Она в Госпитале и я иду к ней. Мы пробудем там, пока Пантера не придет в себя.",
     nil, nil, 25000
   )
 end
@@ -2035,5 +2035,35 @@ function handmade_arts_cnt( inc )
     cnt = cnt + inc
     ogse.save_var( script_name() .. ".handmade_arts_cnt", cnt, "u32" )
   end
-  return cnt
+  return ( cnt > 2 and cnt or 2 )
+end
+
+
+function make_free_prizrak()
+  local npcs = {
+    [ "gen_prizrak_izomorf" ] = {
+      [ "story_id" ] = story_ids.gen_prizrak_izomorf, -- 19017
+    },
+    [ "pripyt_kluk"         ] = {
+      [ "story_id" ] = story_ids.pripyt_kluk, -- 19025
+    },
+    [ "village_piligrim"    ] = {
+      [ "spawn_id" ] = 13048,
+    },
+  }
+  for name, v in pairs( npcs ) do
+    local sobj = alife():object( name )
+    if sobj then
+      alife():release( sobj )
+    end
+    if not v.spawn_id then
+      v.spawn_id = alife():spawn_id( v.story_id )
+    end
+    sobj = alife():create( v.spawn_id )
+    local pk = get_netpk( sobj, 1 )
+    ASSERT( pk:isOk(), "can't read netpacket of %s", sobj:name() )
+    local data = pk:get()
+    data.custom_data:setTable( {} )
+    pk:set( data )
+  end
 end
