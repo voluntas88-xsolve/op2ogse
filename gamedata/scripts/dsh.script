@@ -8,8 +8,8 @@ function attach( sm )
 end
 
 function init()
-  event( "se_monster:on_before_register" ):register( se_on_before_register )
-  event( "se_stalker:on_before_register" ):register( se_on_before_register )
+  event( "se_monster:on_before_register" ):register( this.se_on_before_register )
+  event( "se_stalker:on_before_register" ):register( this.se_on_before_register )
 end
 
 
@@ -322,15 +322,18 @@ function get_art_levels()
 end
 
 
+function get_inv_item_weight( obj )
+  return obj:get_inventory_item_float( 164 )
+end
+
 function set_inv_item_weight( obj, weight )
   obj:set_inventory_item_float( nil, weight, 164 )
 end
 
-
 function change_inv_item_weight( id, weight )
   local obj = level.object_by_id( id )
   if obj then
-    local cur_weight = obj:get_inventory_item_float( 164 )
+    local cur_weight = get_inv_item_weight( obj )
     set_inv_item_weight( obj, cur_weight + weight )
   end
 end
@@ -1138,11 +1141,9 @@ end
 
 function create_and_map_treasure( name, descr, sect, pos, lvid, gvid )
   local sobj = alife():create( sect, pos, lvid, gvid )
-  if ui_mm_opt_main.GetOption( "map_some_treasures" ) then
-    local text = "%c[255,238,155,23]" .. name .. "\\n"
-      .. "%c[default]" .. descr
-    map_add_treasure( sobj.id, "treasure", text )
-  end
+  local text = "%c[255,238,155,23]" .. name .. "\\n"
+    .. "%c[default]" .. descr
+  map_add_treasure( sobj.id, "treasure", text )
   return sobj
 end
 
@@ -1213,73 +1214,100 @@ end
 function blowout_modif_arts()
   local arts = get_art_levels()
   local step = ( 1 + level.get_game_difficulty() ) / 10
+  local create_later = {}
   for i = 1, 65534 do
     local sobj = alife():object( i )
-    if
-      sobj
-      and arts[ sobj:section_name() ]
-      and table.getn( arts[ sobj:section_name() ].next ) < 2
-    then -- подходящий артефакт
-      local modifit = false
-      local lname   = object_level_name( sobj )
-      if has_alife_info( "testsak_" .. lname ) then
-        -- если на этой локации артефакты генерировались, то можно вырождать.
-        -- Иначе пусть лежат в тайниках или где их там заспаунили и ждут.
-        modifit = true
-      end
-      if modifit and sobj.parent_id ~= 0 and sobj.parent_id ~= 65535 then
-        local p_sobj = alife():object( sobj.parent_id )
-        if
-          p_sobj and IsStalker( p_sobj )
-          and ( not p_sobj:can_be_spawned() )
-        then
-          -- если неписю еще не разрешено выходить в онлайн, то и нечего
-          -- модифицировать его артефакты. Вот так и достается нам с
-          -- трупика Шныры булыжник.
-          modifit = false
+    if sobj and is_artefact( sobj:section_name() ) then
+      local sect      = sobj:section_name()
+      local is_af_dyn = string.find( sect, "_dyn[2-5]d" ) and true or false
+      if
+        is_af_dyn
+        or ( arts[ sect ] and table.getn( arts[ sect ].next ) < 2 )
+      then                      -- подходящий артефакт
+        local modifit = false
+        local lname   = object_level_name( sobj )
+        if has_alife_info( "testsak_" .. lname ) then
+          -- если на этой локации артефакты генерировались, то можно вырождать.
+          -- Иначе пусть лежат в тайниках или где их там заспаунили и ждут.
+          modifit = true
         end
-      end
-      if modifit then
-        local cond, pk, data
-        local obj = level.object_by_id( sobj.id )
-        if obj then
-          cond = obj:condition()
-        else
-          pk = get_netpk( sobj, 1 )
-          if pk:isOk() then
-            data = pk:get()
-            cond = data.condition
+        if modifit and sobj.parent_id ~= 0 and sobj.parent_id ~= 65535 then
+          local p_sobj = alife():object( sobj.parent_id )
+          if
+            p_sobj and IsStalker( p_sobj )
+            and ( not p_sobj:can_be_spawned() )
+          then
+            -- если неписю еще не разрешено выходить в онлайн, то и нечего
+            -- модифицировать его артефакты. Вот так и достается нам с
+            -- трупика Шныры булыжник.
+            modifit = false
           end
         end
-        local make_buliz = true
-        if cond then
-          if cond >= 0.01 then
-            make_buliz = false
-            cond = cond - ( math.random() * step )
-            if cond <= 0 then cond = 0 end
-            if obj then
-              dsh.set_condition( obj, cond )
-            else
-              data.condition = cond
-              pk:set( data )
+        if modifit then
+          local cond, pk, data
+          local obj = level.object_by_id( sobj.id )
+          if obj then
+            cond = obj:condition()
+          else
+            pk = get_netpk( sobj, 1 )
+            if pk:isOk() then
+              data = pk:get()
+              cond = data.condition
             end
           end
-        end
-        if make_buliz then
-          if sobj.parent_id == 65535 then
-            alife():create(
-              "af_buliz", sobj.position,
-              sobj.m_level_vertex_id, sobj.m_game_vertex_id
+          local make_buliz = "af_buliz"
+          if is_af_dyn then
+            make_buliz = string.gsub(
+              sect, "_dyn(%d)d",
+              function ( d )
+                return "_dyn" .. ( tonumber( d ) - 1 ) .. "d"
+              end
             )
-          else
-            alife():create(
-              "af_buliz", sobj.position,
-              sobj.m_level_vertex_id, sobj.m_game_vertex_id,
-              sobj.parent_id
-            )
+          elseif cond then
+            if cond >= 0.01 then
+              make_buliz = false
+              cond = cond - ( math.random() * step )
+              if cond <= 0 then cond = 0 end
+              if obj then
+                dsh.set_condition( obj, cond )
+              else
+                data.condition = cond
+                pk:set( data )
+              end
+            end
           end
-          alife():release( sobj )
+          if make_buliz then
+            local t = {}
+            if sobj.parent_id == 65535 then
+              t.args = {
+                make_buliz, sobj.position,
+                sobj.m_level_vertex_id, sobj.m_game_vertex_id
+              }
+            else
+              t.args = {
+                make_buliz, sobj.position,
+                sobj.m_level_vertex_id, sobj.m_game_vertex_id,
+                sobj.parent_id
+              }
+            end
+            if make_buliz ~= "af_buliz" then
+              t.cond = cond
+            end
+            table.insert( create_later, t )
+            alife():release( sobj )
+          end
         end
+      end
+    end
+  end
+  for _, t in ipairs( create_later ) do
+    local sobj = alife():create( unpack( t.args ) )
+    if t.cond then
+      local pk = get_netpk( sobj, 1 )
+      if pk:isOk() then
+        local data = pk:get()
+        data.condition = t.cond
+        pk:set( data )
       end
     end
   end
@@ -2065,5 +2093,41 @@ function make_free_prizrak()
     local data = pk:get()
     data.custom_data:setTable( {} )
     pk:set( data )
+  end
+end
+
+
+function has_wpn_fot()
+  return amk_utils.inventory_search( "wpn_fot", 1 )
+end
+
+
+function make_free_yantar_chernomor()
+  local sobj = alife():story_object( story_ids.yantar_chernomor )
+  if sobj then
+    alife():release( sobj )
+  end
+  local spawn_id = alife():spawn_id( story_ids.yantar_chernomor )
+  sobj = alife():create( spawn_id )
+  local pk = get_netpk( sobj, 1 )
+  ASSERT( pk:isOk(), "can't read netpacket of %s", sobj:name() )
+  local data = pk:get()
+  data.custom_data:setTable( {} )
+  data.story_id = -1
+  pk:set( data )
+end
+
+
+function spawn_2soldier_outfits()
+  local sobj = alife():object( "esc_surprise_box_015" )
+  if not sobj then
+    alife():create( 3556 )
+  end
+end
+
+function del_2soldier_outfits()
+  local sobj = alife():object( "esc_surprise_box_015" )
+  if sobj then
+    alife():release( sobj )
   end
 end

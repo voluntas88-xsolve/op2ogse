@@ -575,22 +575,20 @@ function se_smart_terrain:obj_accepts_smart_terrain( obj )
   end
 
   -- если вообще есть какие-то специальные условия насчёт смартов
-  if obj.smart_terrain_conditions then
+  local conds = obj.smart_terrain_conditions
+  if conds then
     local done = true
     -- перебираем все варианты условий из секции непися
-    --
-    -- TODO: зачем перебирать условия для всех смартов, если можно по
-    -- ключу выбрать только условие для этого?
     if xr_logic.pick_section_from_condlist(
-      db.actor_proxy, obj, obj.smart_terrain_conditions[ "none" ]
+      db.actor_proxy, obj, conds[ "none" ]
     ) then
       return disagreed -- явно прописано, что не идёт ни в какой смарт
     elseif xr_logic.pick_section_from_condlist(
-      db.actor_proxy, obj, obj.smart_terrain_conditions[ self:name() ]
+      db.actor_proxy, obj, conds[ self:name() ]
     ) then
       return agreed_exclusive   -- идёт только в этот смарт
     elseif xr_logic.pick_section_from_condlist(
-      db.actor_proxy, obj, obj.smart_terrain_conditions[ "any" ]
+      db.actor_proxy, obj, conds[ "any" ]
     ) then
       done = false              -- разрешили идти в любой смарт
     end
@@ -606,7 +604,15 @@ function se_smart_terrain:obj_accepts_smart_terrain( obj )
   -- переброску отключенных до (или после) определённого события '
   -- людей и мутантов в другой неэксклюзивный смарт.
   if not obj:can_be_spawned() then
-    return disagreed
+    if
+      not (
+        -- ждет, когда его примет какой-нибудь смарт
+        obj.se_respawn
+        and obj.se_respawn:is_waiting_register_npc( obj.id )
+      )
+    then
+      return disagreed
+    end
   end
 
   return agreed
@@ -617,7 +623,29 @@ end
 -- вызывается симулятором при поиске задания для объекта/группы.
 -- если объект - группа, то вернёт true только если все объекты в
 -- группе вернут true
+local reject_timers = {}
 function se_smart_terrain:enabled( obj )
+  -- enabled(), suitable() и register_npc() вызываются из движка одним
+  -- непрерывным циклом и можно быть уверенным, что к моменту
+  -- следующего апдейта он будет завершен и моб либо будет принят
+  -- каким-нибудь смартом, либо не будет принят никаким.
+  if not reject_timers[ obj.id ] then -- начался цикл поиска смарта для моба
+    reject_timers[ obj.id ] = dsh.exec_on_update(
+      -- если на следующем апдейте этот таймер сработает, значит смарт
+      -- не был найден и нужно известить об этом респаунер
+      function( id )
+        reject_timers[ id ] = nil
+        local sobj = alife():object( id )
+        if
+          sobj and sobj.se_respawn
+          and sobj.se_respawn:is_waiting_register_npc( id )
+        then
+          sobj.se_respawn:on_smart_terrain_reject_npc( sobj )
+        end
+      end, obj.id
+    )
+  end
+
   if self.disabled then
     return false
   end
@@ -649,6 +677,16 @@ function se_smart_terrain:enabled( obj )
       return self:smart_terrain_accepts_obj( obj, b )
     end
   else
+    local conds = obj.smart_terrain_conditions
+    if conds then
+      if
+        conds[ self:name() ]
+        and obj.smart_terrain_conditions_cnt == 1
+        and object_level_name( obj ) ~= level.name()
+      then
+        obj:brain():can_choose_alife_tasks( false )
+      end
+    end
     return false
   end
 end
@@ -720,6 +758,18 @@ function se_smart_terrain:register_npc( obj )
   --   "[smart_terrain %s] register called obj=%s gulag_type=%s",
   --   self:name(), obj:name(), self.gparams.type
   -- )
+  if reject_timers[ obj.id ] then
+    -- моб был принять смартом и нужно остановить таймер, который
+    -- сработает на апдейте и уведомит респаунер, что моба никто не
+    -- принял
+    reject_timers[ obj.id ]:stop()
+    reject_timers[ obj.id ] = nil
+  end
+
+  if obj.se_respawn then
+    obj.se_respawn:on_smart_terrain_register_npc( obj, self )
+  end
+
   local npc_info = {
     -- старые squad и group
     o_group   = obj:g_group(),
@@ -1288,9 +1338,8 @@ function read_smart_terrain_conditions( self )
     end
   end
   if ini and ini:section_exist( sect ) then
-    local conds   = {}
-    local accepts = false
-    local n       = ini:line_count( sect )
+    local conds = {}
+    local n     = ini:line_count( sect )
     if n > 0 then
       for i = 0, n - 1 do
         local result, field, str = ini:r_line( sect, i, "", "" )

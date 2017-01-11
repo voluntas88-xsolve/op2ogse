@@ -75,6 +75,10 @@
 			</phrase>
 			<phrase id="2">
 				<text>artmod_511_dialog_2</text>
+				<next>2_1</next>
+			</phrase>
+			<phrase id="2_1">
+				<text>Полагаю, владельцем является тот, у кого есть комп.</text>
 				<give_info>bar_ivancov_rg6_start</give_info>
 				<action>sak_dialog.take_bar_ivancov_rg6</action>
 			</phrase>
@@ -129,6 +133,7 @@
 			</phrase>
 			<phrase id="2">
 				<text>artmod_411_dialog_2</text>
+				<action>dsh.spawn_2soldier_outfits</action>
 				<give_info>mil_Svoboda_trader_outfit_start</give_info>
 			</phrase>
 			<phrase id="3">
@@ -153,12 +158,12 @@
 			</phrase>
 			<phrase id="2">
 				<text>artmod_412_dialog_2</text>
-				<give_info>mil_Svoboda_trader_outfit_done</give_info>
-				<action>sak_dialog.give_mil_Svoboda_trader_outfit</action>
 				<next>3</next>
 			</phrase>
 			<phrase id="3">
 				<text>artmod_412_dialog_3</text>
+				<give_info>mil_Svoboda_trader_outfit_done</give_info>
+				<action>sak_dialog.give_mil_Svoboda_trader_outfit</action>
 				<give_info>info_artmod_cristall_mosquito_bald</give_info>
 				<action>sak.info_artmod</action>
 			</phrase>
@@ -181,6 +186,10 @@
 			</phrase>
 			<phrase id="2">
 				<text>artmod_431_dialog_2</text>
+				<next>2_1</next>
+			</phrase>
+			<phrase id="2_1">
+				<text>Пошарь в личных ящиках, наверняка такие данные под замком хранятся.</text>
 				<give_info>mil_Svoboda_trader_ammo_start</give_info>
 				<action>sak_dialog.take_mil_Svoboda_trader_ammo</action>
 			</phrase>

@@ -489,10 +489,6 @@ function main_menu:InitGameSetupMenu()
 		f:file_copy(f1, f2)
 		f2 = f:update_path("$game_saves$", "animations.ltx")
 		f:file_copy(f1, f2)
-		f2 = f:update_path("$game_saves$", "hud_plus_enabled.ltx")
-		f:file_copy(f1, f2)
-		f2 = f:update_path("$game_saves$", "map_some_treasures.ltx")
-		f:file_copy(f1, f2)
 	end
 end
 
@@ -537,7 +533,3 @@ function start()
 	end
 end
 --------------------<< CoP style load mod
-
-if ui_mm_opt_main.GetOption("pause_on_load") then 
-	autopause.main()
-end

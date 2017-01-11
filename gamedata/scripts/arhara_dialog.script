@@ -524,13 +524,15 @@ function new_inventory16()
 local se_obj = alife():create("m_inventory_box16", vector():set(-0.047491822391748,-2.4808914661407,-9.304651260376),32285,2880)
 end
 
+
 --' спавним сердце полтергейста и скелеты в пещере
 function af_part_monolit_spawn()
-local obj = alife():create("af_part_monolit",vector():set(0.101,-2.429,-8.607),32286,2880)
---local obj = alife():create("scelet_strong",vector():set(-101.796,2.499,10.035),15428,2870)
---local obj = alife():create("scelet_strong",vector():set(-95.907,5.054,-75.896),17392,2880)
---local obj = alife():create("scelet_strong",vector():set(-92.660,9.809,-117.623),18254,2880)
+  alife():create(
+    "af_part_monolit",
+    vector():set( 0.101, -2.429, -8.607 ), 32286, 2880
+  )
 end
+
 
 --' эта функция проверяет наличие нужных предметов для шахтёра - отключена ибо теперь не нужна
 function arhara_shaxter_have()
@@ -3140,13 +3142,11 @@ function idu_na_nz_sms4()
     nil, nil, 25000, nil,
     [[characters_voice\human_03\stalker\talk\leave\leave_31]]
   )
-  if ui_mm_opt_main.GetOption( "map_some_treasures" ) then
-    local sobj = alife():object( "aver_sekret_nashel_restrictor" )
-    if sobj then
-      local text = "%c[255,238,155,23]Скрытая пещера\\n"
-        .. "%c[default]Где-то здесь должна быть скрытая пещера, которую нужно найти."
-      dsh.map_add_treasure( sobj.id, "treasure", text )
-    end
+  local sobj = alife():object( "aver_sekret_nashel_restrictor" )
+  if sobj then
+    local text = "%c[255,238,155,23]Скрытая пещера\\n"
+      .. "%c[default]Где-то здесь должна быть скрытая пещера, которую нужно найти."
+    dsh.map_add_treasure( sobj.id, "treasure", text )
   end
 end
 
@@ -3985,9 +3985,27 @@ end
 function sms_otez_poreshil4()
 news_manager.send_tip(db.actor, "%c[255,160,160,160]".."ОТЕЦ ПАНТЕРЫ:".."\\n".."%c[255,255,128,128]Пешки тоже становятся ферзями. Я займусь пешками - а ты разбирайся с остальными. Жду известий.".."".."\n", nil, nil, 25000, nil, [[characters_voice\human_03\stalker\talk\labux\labux_92]])
 end
-function na_kamne_sms()
-news_manager.send_tip(db.actor, "%c[255,160,160,160]".."СТРЕЛОК:".."\\n".."%c[255,255,128,128]Ну, похоже это именно тот камень... Придётся ждать. Главное - не выходить из радиуса слышимости - иначе я ничего не услышу.".."".."\n", nil, nil, 20000, nil, [[characters_voice\human_03\stalker\talk\labux\labux_76]])
+
+
+function del_stalker_kisluy()
+  local sobj = alife():object( "stalker_kisluy" )
+  if sobj then
+    alife():release( sobj, true )
+  end
 end
+
+function na_kamne_sms()
+  news_manager.send_tip(
+    db.actor,
+    "%c[255,160,160,160]" .. "СТРЕЛОК:" .. "\\n"
+    .. "%c[255,255,128,128]Ну, похоже это именно тот камень... Придётся ждать. Главное - не выходить из радиуса слышимости - иначе я ничего не услышу.".."".."\n",
+    nil, nil, 20000, nil,
+    [[characters_voice\human_03\stalker\talk\labux\labux_76]]
+  )
+  del_stalker_kisluy()
+end
+
+
 function sms_razgovor_sxod_nz()
 news_manager.send_tip(db.actor, "%c[255,160,160,160]".."ЗЛОБНЫЙ:".."\\n".."%c[255,255,128,128]Надеюсь, хвоста за тобой не было. Ты куда это ноги, вернее ногу нарисовал с Генераторов? Мы же за тобой пришли. И что там за профи тебя пас?".."".."\n", nil, nil, 25000, nil, [[characters_voice\human_03\stalker\talk\labux\labux_93]])
 end
@@ -7217,10 +7235,17 @@ function vernul_kartinku(first_speaker, second_speaker)
 sak.out_item_namber("kisluy",1)
  end
 
+
 --' рюкзак Злобного
 function rukzak_zlobnogo()
-local se_obj = alife():create("m_inventory_box36", vector():set(-170.294,3.940,-148.568),66879,559)
- end
+  dsh.create_and_map_treasure(
+    "Тайник Злобного",
+    "Нужно забрать из него какой-то предмет и показать Сахарову.",
+    "m_inventory_box36",
+    vector():set( -170.294, 3.940, -148.568 ), 66879, 559
+  )
+end
+
 
 --' убираем Злобного с Авера
 function dell_aver_zlobn()
