@@ -382,9 +382,7 @@ end
 
 
 function is_zone_bio_art( obj )
-  local props = db.artefacts[ obj:id() ]
-  ASSERT( props, "not found in db.artefacts: %s", obj:name() )
-  return not props.handmade
+  return true
 end
 
 
