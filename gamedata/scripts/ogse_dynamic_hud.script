@@ -24,12 +24,10 @@ function attach(sm)
     signal = "on_update", fun = this.ui_rad_update,
     script_name = script_name() .. ".ui_rad_update",
   })
-  if amk.load_variable( "option_hud", 2 ) == 2 then
-    sm:subscribe({
-      signal = "on_update", fun = this.blurs_update,
-      script_name = script_name() .. ".blurs_update",
-    })
-  end
+  sm:subscribe({
+    signal = "on_update", fun = this.blurs_update,
+    script_name = script_name() .. ".blurs_update",
+  })
 end
 auto_attach = true
 
@@ -81,6 +79,7 @@ class "check_sniper_timer" ( ogse_qt.quick_timer )
 function check_sniper_timer:__init() super()
   self.hidden         = false
   self.on_sniper_mode = false
+  self.sm             = ogse_signals.get_mgr()
   self.sniper_mode    = false
   self.zoom_mode      = false
   self.zoomed         = false
@@ -168,8 +167,7 @@ function check_sniper_timer:update_hud_elements()
         self.hidden = true
       end
       if not wpn_IsRotatingToZoom( db.actor:active_item() ) then
-        ogse_signals.get_mgr():call( "on_sniper_mode", true )
-        self.on_sniper_mode = true
+        self:change_on_sniper_mode( true )
       end
     end
   elseif self.hidden then
@@ -180,8 +178,7 @@ function check_sniper_timer:update_hud_elements()
     ui_rad.update( true )
     sak.show_time()
     if self.on_sniper_mode then
-      ogse_signals.get_mgr():call( "on_sniper_mode", false )
-      self.on_sniper_mode = false
+      self:change_on_sniper_mode( false )
     end
     self.hidden = false
   elseif self.zoom_mode then
@@ -193,6 +190,12 @@ function check_sniper_timer:update_hud_elements()
     check_my_suit_hud( true )
     self.zoomed = false
   end
+end
+
+
+function check_sniper_timer:change_on_sniper_mode( mode )
+  self.sm:call( "on_sniper_mode", mode )
+  self.on_sniper_mode = mode
 end
 
 
@@ -343,7 +346,6 @@ end
 
 
 function init_blurs()
-  if amk.load_variable( "option_hud", 2 ) < 2 then return end
   if
     mycurrent_suithud
     and not string.find( mycurrent_suithud, "_red3", -5, true )
