@@ -789,7 +789,7 @@ local level_arts = {
       af_spirit_1 =  1,
       af_spirit_2 =  1,
       af_spirit_3 =  0.5,
-      af_capsule  =  0.1,
+      af_capsule  =  0.5,
       balb_2      =  2,
       balb_3      =  2,
       buzz_1      =  5,
@@ -831,7 +831,7 @@ local level_arts = {
       af_spirit_1 =  1,
       af_spirit_2 =  1,
       af_spirit_3 =  0.5,
-      af_capsule  =  0.1,
+      af_capsule  =  0.5,
       balb_1      =  1,
       balb_2      =  3,
       balb_3      =  2,
@@ -910,24 +910,24 @@ local level_arts = {
     {
       af_armor_2  =  1,
       af_armor_3  =  1,
-      af_armor_4  =  1, --0.5,
+      af_armor_4  =  1,
       af_babka_2  =  1,
-      af_babka_3  =  1, --0.5,
+      af_babka_3  =  1,
       af_buliz    =  1,
       af_cry_2    =  1,
-      af_cry_3    =  1, --0.5,
+      af_cry_3    =  1,
       af_dik_1    =  1,
       af_dik_2    =  0.5,
       af_dik_3    =  0.5,
       af_kol_2    =  1,
       af_kol_3    =  1,
-      af_kol_4    =  1, --0.5,
+      af_kol_4    =  1,
       af_pudd_2   =  1,
       af_pudd_3   =  1,
-      af_pudd_4   =  1, --0.5,
+      af_pudd_4   =  1,
       af_spirit_2 =  1,
       af_spirit_3 =  1,
-      af_spirit_4 =  1, --0.5,
+      af_spirit_4 =  1,
       balb_1      =  3,
       balb_2      =  5,
       balb_3      =  4,
@@ -1523,24 +1523,24 @@ local level_arts = {
       acumm       =  2,
       af_armor_2  =  1,
       af_armor_3  =  1,
-      af_armor_4  =  0.5,
+      af_armor_4  =  1,
       af_babka_2  =  1,
-      af_babka_3  =  0.5,
+      af_babka_3  =  1,
       af_buliz    =  1,
       af_cry_2    =  1,
-      af_cry_3    =  0.5,
+      af_cry_3    =  1,
       af_dik_1    =  1,
-      af_dik_2    =  0.5,
-      af_dik_3    =  0.5,
+      af_dik_2    =  1,
+      af_dik_3    =  1,
       af_kol_2    =  1,
       af_kol_3    =  1,
-      af_kol_4    =  0.5,
+      af_kol_4    =  1,
       af_pudd_2   =  1,
       af_pudd_3   =  1,
-      af_pudd_4   =  0.5,
+      af_pudd_4   =  1,
       af_spirit_2 =  1,
       af_spirit_3 =  1,
-      af_spirit_4 =  0.5,
+      af_spirit_4 =  1,
       balb_1      =  2,
       balb_2      =  3,
       balb_3      =  3,
@@ -1574,24 +1574,24 @@ local level_arts = {
     {
       af_armor_2  =  1,
       af_armor_3  =  1,
-      af_armor_4  =  0.5,
+      af_armor_4  =  1,
       af_babka_2  =  1,
-      af_babka_3  =  0.5,
+      af_babka_3  =  1,
       af_buliz    =  1,
       af_cry_2    =  1,
-      af_cry_3    =  0.5,
+      af_cry_3    =  1,
       af_dik_1    =  1,
-      af_dik_2    =  0.5,
-      af_dik_3    =  0.5,
+      af_dik_2    =  1,
+      af_dik_3    =  1,
       af_kol_2    =  1,
       af_kol_3    =  1,
-      af_kol_4    =  0.5,
+      af_kol_4    =  1,
       af_pudd_2   =  1,
       af_pudd_3   =  1,
-      af_pudd_4   =  0.5,
+      af_pudd_4   =  1,
       af_spirit_2 =  1,
       af_spirit_3 =  1,
-      af_spirit_4 =  0.5,
+      af_spirit_4 =  1,
       balb_1      =  2,
       balb_2      =  3,
       balb_3      =  3,
@@ -1746,11 +1746,35 @@ function after_blow_on()
     [ db.actor:level_vertex_id() ] = true,
   }
   forbidden_pos   = { db.actor:position() }
+  dsh_respawn.iterate_respawners(
+    function( resp )
+      local pos, lv, gv = unpack( resp.xyzlg )
+      local lid = location_id_by_gvid( gv )
+      if lid then
+        local resp_lname = level_system_name_by_lid( lid )
+        if resp_lname == lname then
+          forbidden_lvids[ lv ] = true
+          table.insert( forbidden_pos, pos )
+        end
+      end
+    end
+  )
+  se_respawn.iterate_respawners(
+    function( sobj )
+      if object_level_name( sobj ) == lname then
+        forbidden_lvids[ sobj.m_level_vertex_id ] = true
+        table.insert( forbidden_pos, sobj.position )
+      end
+    end
+  )
   for id = 1, 65534 do
     local sobj = alife():object( id )
     if
       sobj and object_level_name( sobj ) == lname
-      and ( IsStalker( sobj ) or IsMonster( sobj ) )
+      and (
+        IsStalker( sobj ) or IsMonster( sobj )
+        or sobj:clsid() == clsid.smart_terrain
+      )
     then
       forbidden_lvids[ sobj.m_level_vertex_id ] = true
       table.insert( forbidden_pos, sobj.position )
@@ -1770,6 +1794,27 @@ function pre_blow_off()
     [ db.actor:level_vertex_id() ] = true,
   }
   forbidden_pos   = { db.actor:position() }
+  dsh_respawn.iterate_respawners(
+    function( resp )
+      local pos, lv, gv = unpack( resp.xyzlg )
+      local lid = location_id_by_gvid( gv )
+      if lid then
+        local resp_lname = level_system_name_by_lid( lid )
+        if resp_lname == lname then
+          forbidden_lvids[ lv ] = true
+          table.insert( forbidden_pos, pos )
+        end
+      end
+    end
+  )
+  se_respawn.iterate_respawners(
+    function( sobj )
+      if object_level_name( sobj ) == lname then
+        forbidden_lvids[ sobj.m_level_vertex_id ] = true
+        table.insert( forbidden_pos, sobj.position )
+      end
+    end
+  )
   for id = 1, 65534 do
     local sobj = alife():object( id )
     if sobj then
@@ -1784,7 +1829,10 @@ function pre_blow_off()
         end
       elseif
         map == level.name()
-        and ( IsStalker( sobj ) or IsMonster( sobj ) )
+        and (
+          IsStalker( sobj ) or IsMonster( sobj )
+          or sobj:clsid() == clsid.smart_terrain
+        )
       then
         forbidden_lvids[ sobj.m_level_vertex_id ] = true
         table.insert( forbidden_pos, sobj.position )

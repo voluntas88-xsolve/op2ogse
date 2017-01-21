@@ -15,7 +15,10 @@ end
 
 function on_before_spawn()
   local build = ogse.load_var_safe( script_name() .. ".build" )
-  log2( "[%s]: loaded build: %s", script_name(), tostring( build ) )
+  log2(
+    "[%s]: [%s] loaded build: %s",
+    script_name(), get_string_wq( "dsh.build", "build" ), tostring( build )
+  )
   db.actor:disable_info_portion( "biznes_remove_special_item" )
   build_ru_upper_to_lower()
   load_kbd_keys()
@@ -1324,13 +1327,13 @@ function get_next_random( vname, ... )
     min, max = unpack( args )
   end
   if min and max and min == max then return min end
-  local nums = ogse.load_var( vname, {} )
+  local nums = ogse.load_var_safe( vname ) or {}
   while table.getn( nums ) < 100 do
     table.insert( nums, math.random() )
   end
   local cur_num = tonumber( table.remove( nums, 1 ) )
   table.insert( nums, math.random() )
-  ogse.save_var( vname, nums, "array", "float" )
+  ogse.save_var( vname, nums, "array_template", { "float" } )
   if table.getn( args ) > 0 then
     cur_num = min + round( cur_num * ( max - min ) )
   end
@@ -1358,7 +1361,7 @@ function mil_dolg_enemy()
     for id, v in pairs( strn.npc_info ) do
       local npc = alife():object( id )
       if npc then
-        relation_registry.set_goodwill( npc.id, db.actor:id(), -5000 )
+        relation_registry.set_goodwill( npc.id, db.actor:id(), -9000 )
       end
     end
   end
@@ -2131,4 +2134,15 @@ function del_2soldier_outfits()
   if sobj then
     alife():release( sobj )
   end
+end
+
+
+function get_actor_name()
+  return ( has_alife_info( "esc_find_doctor_done" ) and "Стрелок" or "Меченый" )
+end
+
+
+function spawn_bland_flash( npc, actor )
+  if npc:id() == db.actor:id() then npc = actor end
+  amk.spawn_item_in_inv( "bland_flash", npc )
 end

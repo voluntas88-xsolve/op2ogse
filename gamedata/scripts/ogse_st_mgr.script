@@ -25,18 +25,20 @@
 -- class "test_timer" ( ogse_st_mgr.savable_timer )
 -- function test_timer:__init() super()
 --   -- обязательная строка с именем класса таймера
---   self._class = script_name() .. ".test_timer"
+--   self.class = script_name() .. ".test_timer"
 -- end
 -- -- метод для первичной инициализации, может иметь произвольное имя
 -- function test_timer:set_data( s )
 --   self.str = s
 -- end
 -- перегруженные методы загрузки/сохранения пользовательских данных
--- function test_timer:load( packet )
---   self.str = packet:r_stringZ()
+-- function test_timer:load( t )
+--   self.str = unpack( t )
 -- end
--- function test_timer:save( packet )
---   packet:w_stringZ( self.str )
+-- function test_timer:save( t, template )
+--   table.insert( template, "string" )
+--   table.insert( t,        self.str )
+--   return template
 -- end
 -- -- перегруженный метод действия по временнОму условию
 -- function test_timer:taction()
@@ -58,18 +60,20 @@
 --
 -- class "conditional_timer" ( ogse_st_mgr.savable_timer )
 -- function conditional_timer:__init( timer_id ) super( timer_id )
---   self._class = script_name() .. ".conditional_timer"
+--   self.class = script_name() .. ".conditional_timer"
 -- end
 -- function conditional_timer:init( npc_id )
 --   self.npc_id = npc_id
 --   return self -- для вызова цепочкой
 -- end
 -- перегруженные методы загрузки/сохранения пользовательских данных
--- function conditional_timer:load( packet )
---   self.npc_id = packet:r_u16()
+-- function conditional_timer:load( t )
+--   self.npc_id = unpack( t )
 -- end
--- function conditional_timer:save( packet )
---   packet:w_u16( self.npc_id )
+-- function conditional_timer:save( t, template )
+--   table.insert( template, "u16"       )
+--   table.insert( t,        self.npc_id )
+--   return template
 -- end
 -- function conditional_timer:condition()
 --   self.npc = level.object_by_id( self.npc_id )
@@ -118,7 +122,8 @@ end
 function get_timer( id )
   local timer = registry[ id ]
   ASSERT(
-    timer, "ogse_st_mgr.get_timer: timer with id'" .. id .. "' doesn't exist"
+    timer,
+    "ogse_st_mgr.get_timer: timer with id '%s' doesn't exist", id
   )
   return timer
 end
@@ -131,24 +136,53 @@ end
 
 -- загрузка всех таймеров
 function on_load()
+  local timers = ogse.load_var_safe( script_name() .. ".timers" )
+  if not timers then return on_load_old() end
+  local t_cnt = 0
+  for _, timer_class in ipairs( timers ) do
+    local st = ogse.load_var(
+      string.format( "%s.timers.%s", script_name(), timer_class )
+    )
+    for _, t in ipairs( st ) do
+      local timer_id = table.remove( t, 1 )
+      local f, msg = loadstring( "return " .. timer_class .. "( ... )" )
+      ASSERT( f, msg )
+      local timer = f( timer_id )
+      timer:_aux_load( t )
+      timer.loaded = true
+      timer:start()
+      t_cnt = t_cnt + 1
+    end
+    log2(
+      "[%s]: %s: %s timers loaded",
+      script_name(), timer_class, table.getn( st )
+    )
+  end
+  sort_all_timers()
+  log2( "[%s]: %s all timers loaded", script_name(), t_cnt )
+end
+
+
+function on_load_old()
   local chunks = ogse.load_var_safe( script_name() .. ".chunks" )
-  if not chunks then return on_load_old() end
+  if not chunks then return on_load_old2() end
   for _, pk in ipairs( chunks ) do
     local timer_id    = pk:r_stringZ()
     local timer_class = pk:r_stringZ()
     local f, msg = loadstring( "return " .. timer_class .. "(...)" )
     ASSERT( f, msg )
     local timer = f( timer_id )
-    timer:_aux_load( pk )
+    timer:_aux_load_old( pk )
     timer.loaded = true
     timer:start()
   end
+  ogse.delete_var( script_name() .. ".chunks" )
   sort_all_timers()
   log2( "[%s]: %s timers loaded", script_name(), table.getn( chunks ) )
 end
 
 
-function on_load_old()
+function on_load_old2()
   local timers_list = ogse.load_var( root_guid, {}, "array" )
   for _, timer_id in ipairs( timers_list ) do
     local timer_chunk = ogse.load_var( storage_guid .. "_" .. timer_id )
@@ -156,7 +190,7 @@ function on_load_old()
     local f, msg = loadstring( "return " .. timer_class .. "(...)" )
     ASSERT( f, msg )
     local timer = f( timer_id )
-    timer:_aux_load( timer_chunk )
+    timer:_aux_load_old( timer_chunk )
     timer:start()
     ogse.delete_var( storage_guid .. "_" .. timer_id )
   end
@@ -169,17 +203,46 @@ end
 
 -- сохранение состояния всех таймеров
 function on_save()
-  local chunks = {}
-  for timer_id, timer in pairs( registry ) do
-    local pk = net_packet()
-    pk:w_begin( 123 )     -- двухбайтовая заглушка
-    pk:r_seek( 2 )        -- чтобы пропустить эти два байта при чтении
-    table.insert( chunks, pk )
-    pk:w_stringZ( timer_id )
-    timer:_aux_save( pk )
+  local timers, tclasses = {}, {}
+  for _, t in pairs( registry ) do
+    if timers[ t.class ] then
+      table.insert( timers[ t.class ], t )
+    else
+      timers[ t.class ] = { t }
+      table.insert( tclasses, t.class )
+    end
   end
-  ogse.save_var( script_name() .. ".chunks", chunks, "array", "chunk" )
-  log2( "[%s]: %s timers saved", script_name(), table.getn( chunks ) )
+  ogse.save_var(
+    script_name() .. ".timers", tclasses, "array_template", { "string" }
+  )
+  local t_cnt = 0
+  for tclass, tlist in pairs( timers ) do
+    local st, template = {}, { "string" }
+    for i, timer in ipairs( tlist ) do
+      local t  = { timer.id }
+      table.insert( st, t )
+      local types = timer:_aux_save( t )
+      if i == 1 then
+        for _, typ in ipairs( types ) do
+          table.insert( template, typ )
+        end
+      end
+      ASSERT(
+        table.getn( t ) == table.getn( template ),
+        "unexpected table size: got %s, expected %s",
+        table.getn( t ), table.getn( template )
+      )
+      t_cnt = t_cnt + 1
+    end
+    ogse.save_var(
+      string.format( "%s.timers.%s", script_name(), tclass ),
+      st, "array_template", template
+    )
+    log2(
+      "[%s]: %s: %s timers saved", script_name(), tclass, table.getn( st )
+    )
+  end
+  log2( "[%s]: %s all timers saved", script_name(), t_cnt )
 end
 
 
@@ -201,7 +264,7 @@ function register_any_timer( t )
     q       = r_high_queue
     sort_by = t._loading_time + t._residual_time * 1000
   else
-    abort( "unknown timer type: %s.%s", t._class, t._id )
+    abort( "unknown timer type: %s.%s", t.class, t.id )
   end
   local last_t = q[ table.getn( q ) ]
   local new_t  = {
@@ -213,18 +276,18 @@ function register_any_timer( t )
   if not t.loaded then
     if last_t and new_t.sort_by >= last_t.sort_by then
       log2(
-        "[%s]: %s.%s: skip sort_any_timer", script_name(), t._class, t._id
+        "[%s]: %s.%s: skip sort_any_timer", script_name(), t.class, t.id
       )
     else
       sort_any_timers( q )
     end
   end
-  registry[ t._id ] = t
+  registry[ t.id ] = t
 end
 
 function unregister_any_timer( t )
   local q = t._queue
-  registry[ t._id ] = nil
+  registry[ t.id ] = nil
   local found = false
   for i = 1, table.getn( q ) do
     if rawequal( t, q[ i ].timer ) then
@@ -233,7 +296,7 @@ function unregister_any_timer( t )
       break
     end
   end
-  ASSERT( found, "can't find requested timer: %s.%s", t._class, t._id )
+  ASSERT( found, "can't find requested timer: %s.%s", t.class, t.id )
 end
 
 function sort_any_timers( q )
@@ -253,7 +316,7 @@ function process_g_queue( q )
   ) do
     local t = q[ 1 ].timer
     table.remove( q, 1 )
-    registry[ t._id ] = nil
+    registry[ t.id ] = nil
     t:taction()
   end
 end
@@ -264,7 +327,7 @@ function process_r_queue( q )
     local time_from_loading = 1.0e-3 * ( time_global() - t._loading_time )
     if t._residual_time <= time_from_loading then
       table.remove( q, 1 )
-      registry[ t._id ] = nil
+      registry[ t.id ] = nil
       t:taction()
     else
       break
@@ -280,7 +343,7 @@ end
 -- конструктор таймера в базовом классе
 class "savable_timer"
 function savable_timer:__init( timer_id )
-  self._class = "error: it is forbidden to create instances of a base savable timer class!"
+  self.class  = "error: it is forbidden to create instances of a base savable timer class!"
   self.loaded = false
   if timer_id then
     ASSERT(
@@ -288,18 +351,41 @@ function savable_timer:__init( timer_id )
       "savable_timer:__init: custom id assigned to timer must be a string or be convertible to a string"
     )
     ASSERT(
-      not timer_exists( timer_id ),
-      "savable_timer:__init: timer with the id '" .. timer_id .. "' already exists!"
+      ( not timer_exists( timer_id ) ),
+      "savable_timer:__init: timer with the id '%s' already exists!", timer_id
     )
-    self._id = tostring( timer_id )
+    self.id = tostring( timer_id )
   else
-    self._id = get_free_id()
+    self.id = get_free_id()
   end
   self.sm = ogse_signals.get_mgr()
 end
 
 
-function savable_timer:_aux_load( packet )
+function savable_timer:_aux_load( t )
+  self._high_priority = table.remove( t, 1 )
+  -- загружаем сохранённое время срабатывания по шкале реальных и игровых
+  -- секунд
+  local res_time = table.remove( t, 1 )
+  if res_time ~= 0 then
+    -- строго нулевое значение означает, что таймер реальных секунд не задан
+    self:set_delay( res_time )
+  end
+  -- загружаем игровое время срабатывания
+  local end_t = table.remove( t, 1 )
+  if end_t ~= game.CTime() then
+    self:set_gtime( end_t )
+  end
+  -- загружаем игровое время запуска
+  self._start_time = table.remove( t, 1 )
+  -- загружаем данные пользователя, если есть
+  if table.getn( t ) > 0 then
+    self:load( t )
+  end
+end
+
+
+function savable_timer:_aux_load_old( packet )
   self._high_priority = packet:r_bool()
   -- загружаем сохранённое время срабатывания по шкале реальных и игровых
   -- секунд
@@ -317,14 +403,14 @@ function savable_timer:_aux_load( packet )
   self._start_time = utils.r_CTime_ex( packet )
   -- загружаем данные пользователя, если есть
   if not packet:r_eof() then
-    self:load( packet )
+    self:load_old( packet )
   end
 end
 
 
-function savable_timer:_aux_save( timer_chunk )
-  timer_chunk:w_stringZ( self._class )
-  timer_chunk:w_bool( self._high_priority )
+function savable_timer:_aux_save( t )
+  local template = { "bool", "float", "time", "time" }
+  table.insert( t, self._high_priority )
   -- сохранение времени срабатывания по шкале реального и игрового времени
   -- включено в состав заголовка таймера.
   -- сохраняем время до срабатывания по шкале реальных секунд
@@ -332,31 +418,31 @@ function savable_timer:_aux_save( timer_chunk )
     -- вычисляем и пишем новое оставшееся до выполнения время
     local time_from_loading = 1.0e-3 * ( time_global() - self._loading_time )
     local delay = self._residual_time - time_from_loading
-    -- ASSERT( delay > 0, "wrong delay = %s: %s.%s", delay, self._class, self._id )
+    -- ASSERT( delay > 0, "wrong delay = %s: %s.%s", delay, self.class, self.id )
     if delay > 0 then
-      timer_chunk:w_float( delay )
+      table.insert( t, delay )
     else
       log2(
         "[%s]: saving wrong delay = %s: %s.%s",
-        script_name(), delay, self._class, self._id
+        script_name(), delay, self.class, self.id
       )
-      timer_chunk:w_float( -1 )
+      table.insert( t, -1 )
     end
   else
     -- строго нулевое значение будет означать, что таймер реальных секунд не
     -- задан
-    timer_chunk:w_float( 0 )
+    table.insert( t, 0 )
   end
   -- сохраняем игровое время срабатывания
   if self._game_termination_time then
-    utils.w_CTime_ex( timer_chunk, self._game_termination_time )
+    table.insert( t, self._game_termination_time )
   else
-    utils.w_CTime_ex( timer_chunk, game.CTime() )
+    table.insert( t, game.CTime() )
   end
   -- сохраняем время запуска
-  utils.w_CTime_ex( timer_chunk, self._start_time )
+  table.insert( t, self._start_time )
   -- теперь сохраняем данные пользователя, если есть
-  self:save( timer_chunk )
+  return self:save( t, template )
 end
 
 
@@ -437,10 +523,10 @@ function savable_timer:start()
   self._high_priority  = false
   self._cond_slot_desc = {
     signal = "on_update", self = self, fun = self._aux_cond,
-    script_name = ( self.script_name or self._class ),
+    script_name = ( self.script_name or self.class ),
   }
   self.sm:subscribe( self._cond_slot_desc )
-  registry[ self._id ] = self
+  registry[ self.id ] = self
   return self
 end
 
@@ -448,7 +534,7 @@ end
 -- останов таймера
 function savable_timer:stop()
   self.sm:unsubscribe( self._cond_slot_desc )
-  registry[ self._id ] = nil
+  registry[ self.id ] = nil
 end
 
 
@@ -488,8 +574,9 @@ function savable_timer:taction() end
 
 
 -- переопределять для сохранения/загрузки пользовательских данных
-function savable_timer:load( packet ) end
-function savable_timer:save( packet ) end
+function savable_timer:load( t ) end
+function savable_timer:load_old( packet ) end
+function savable_timer:save( t, template ) return template end
 
 
 --------------------------------------------------------------------------------
@@ -499,7 +586,7 @@ function savable_timer:save( packet ) end
 --------------------------------------------------------------------------------
 class "delayed_fun_start" ( savable_timer )
 function delayed_fun_start:__init( name ) super( name )
-  self._class = script_name() .. ".delayed_fun_start"
+  self.class = script_name() .. ".delayed_fun_start"
 end
 
 function delayed_fun_start:init( action_name, ... )
@@ -514,7 +601,17 @@ function delayed_fun_start:init( action_name, ... )
   return self
 end
 
-function delayed_fun_start:load( packet )
+function delayed_fun_start:load( t )
+  self.action_name, self.fun_params = unpack( t )
+  self.user_action = loadstring( "return " .. self.action_name .. "( ... )" )
+  ASSERT(
+    self.user_action,
+    "delayed_fun_start:load: can not compile function with the name '%s'",
+    tostring( self.action_name )
+  )
+end
+
+function delayed_fun_start:load_old( packet )
   self.action_name = packet:r_stringZ()
   self.user_action = loadstring( "return " .. self.action_name .. "( ... )" )
   ASSERT(
@@ -530,10 +627,13 @@ function delayed_fun_start:load( packet )
   self.fun_params = array_item:get_value()
 end
 
-function delayed_fun_start:save( packet )
-  packet:w_stringZ( self.action_name )
-  local array_item = ogse_unist.create_item( "", self.fun_params, "array" )
-  ogse_unist.write_item_to_packet( packet, array_item )
+function delayed_fun_start:save( t, template )
+  for _, typ in ipairs({ "string", { "array" } }) do
+    table.insert( template, typ )
+  end
+  table.insert( t, self.action_name )
+  table.insert( t, self.fun_params  )
+  return template
 end
 
 function delayed_fun_start:start()
