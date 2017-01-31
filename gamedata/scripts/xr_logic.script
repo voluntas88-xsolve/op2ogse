@@ -1533,7 +1533,7 @@ function pstor_save_all( obj, packet )
     db.storage[ npc_id ].pstor = pstor
   end
 
-  if obj:id() == db.actor:id() then
+  if obj:name() == "single_player" then
     packet = net_packet()
     packet:w_begin( 123 )
     packet:r_seek( 2 )
@@ -1546,7 +1546,7 @@ function pstor_save_all( obj, packet )
   packet:w_u32( ctr )
 
   for k, v in pairs( pstor ) do
-    -- log2("_bp: pstor_save_all: saving [%s]='%s'", utils.to_str(k), utils.to_str(v))
+    -- log2( "[%s]: %s: %s = %s", script_name(), obj:name(), tostring( k ), tostring( v )  )
     packet:w_stringZ( k )
     local tv = type( v )
     if tv == "number" then
