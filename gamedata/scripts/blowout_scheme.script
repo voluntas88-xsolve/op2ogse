@@ -1,8 +1,14 @@
+-- -*- mode: lua; coding: windows-1251-dos -*-
 ----------------------------------------------
 -- Copyright (c) 2007 Dmitri 'Red75' Roschin                                              
 ----------------------------------------------
 -- Blowout hide v0.25 Behavioral scheme 
 ----------------------------------------------
+
+function attach( sm )
+  sm:subscribe({ signal = "on_after_blowout", fun = this.on_after_blowout })
+end
+
 
 evid_blowout=18572
 evid_outside=evid_blowout+1
@@ -16,62 +22,22 @@ actid_preblow=evid_blowout+2
 actid_monopray=evid_blowout+3
 actid_anomaly=evid_blowout+4
 
---[[
-class "evaluator_regen" (property_evaluator)
 
-function evaluator_regen:__init(st,fullhealthtime) super(nil,"evaluator_regen")
-  self.st=st
-  self.fhtime=fullhealthtime
+local evaluate_blowout_until
+function on_after_blowout()
+  -- что бы evaluator_blowout отпускал неписей только после того, как
+  -- ogse_anomaly_evader обновит для них ограничения.
+  evaluate_blowout_until = time_global() + ogse_anomaly_evader.get_freq() * 3
 end
 
-function evaluator_regen:evaluate()
-  local npc=self.object
-  if not npc:alive() then
-    amk.mylog("regen nonalive")
-    return false
-  end
-  if not self.prevtime then
-    self.prevtime=time_global()
-  end
-  local delta=time_global()-self.prevtime
-  self.prevtime=time_global()
-  local healthinc=npc:max_health()/self.fhtime*delta
-  amk.mylog("regen for "..npc:character_name().." "..healthinc.." "..npc.health)
-  if npc.health>0 and npc.health<npc:max_health() then
-    npc.health=npc.health+healthinc
-  amk.mylog("postregen for "..npc:character_name().." "..healthinc.." "..npc.health)
-  end
-  return false
-end
-]]
 
---[[
-class "evaluator_anomaly" (property_evaluator)
-
-function evaluator_anomaly:__init(st) super(nil,"evaluator_anomaly")
-  self.st=st
-  self.prevstr=""
-  self.st.anomnotdone=false
-  self.st.prevanom=""
-  self.st.curanom=""
-end
-
-function evaluator_anomaly:evaluate()
-  local npc=self.object
-  if not self.prev_pos then
-    self.prev_pos=vector():set(0,-100,0)
+function get_blowout_step()
+  local blowout = amk.load_variable( "blowout", 0 )
+  if evaluate_blowout_until and evaluate_blowout_until > time_global() then
+    blowout = 5
   end
-  if self.prev_pos:distance_to(npc:position())>15 then
-    self.st.avg_dir=npc:position():sub(self.prev_pos):normalize()
-    self.prev_pos=npc:position()
-    local list=amk_anoms.get_anomaly_list(npc,20)
-    for i,o in ipairs(list) do
-			amk_anoms.add_restriction(npc,o.id,o.name)
-    end
-  end
-  return amk_anoms.have_pending_sync(npc)
+  return blowout
 end
-]]
 
 
 class "evaluator_blowout" (property_evaluator)
@@ -81,40 +47,41 @@ function evaluator_blowout:__init(st) super(nil,"evaluator_blowout")
   self.prevblow=0
 end
 
+
 function evaluator_blowout:evaluate()
-  local npc=self.object
-  --get_console():execute("load ~~~eval blowout "..npc:character_name())
-  --get_console():execute("flush")
-  if amk_mod.blowout_type()>0 or xr_wounded.is_wounded(npc) then return false end
-  local blowout=amk.load_variable("blowout",0)
-  if self.prevblow==3 and blowout~=3 then
-    self.prevblow=blowout
-    npc.health=1
+  local npc = self.object
+  if amk_mod.blowout_type() > 0 or xr_wounded.is_wounded( npc ) then
+    return false
   end
-  if blowout==0 and self.st.out_rest then
-    npc:add_restrictions(self.st.out_rest,"") --self.st.in_rest)
-    self.st.out_rest=nil
-    self.st.in_rest=nil
+  local blowout = get_blowout_step()
+  if self.prevblow == 3 and blowout ~= 3 then
+    self.prevblow = blowout
+    npc.health    = 1
   end
-  if blowout==0 then
-    self.st.need_run=false
-  end
-  if blowout==3 then
-    if self.hittime==nil or self.hittime<time_global() then
-      self.hittime=time_global()+1000
-      if amk_mod.on_blowout_hit(npc,self.st.hide) then
-        self.st.need_run=true
+  if blowout == 0 then
+    if self.st.out_rest then
+      npc:add_restrictions( self.st.out_rest, "" )
+      self.st.out_rest = nil
+      self.st.in_rest  = nil
+    end
+    self.st.need_run = false
+  elseif blowout == 3 then
+    if ( not self.hittime ) or self.hittime < time_global() then
+      self.hittime = time_global() + 1000
+      if amk_mod.on_blowout_hit( npc, self.st.hide ) then
+        self.st.need_run = true
         if npc:alive() then
-          xr_wounded.hit_callback(npc:id())
+          xr_wounded.hit_callback( npc:id() )
         end
       end
     end
   end
-  if self.st.washitat and self.st.washitat>time_global() then
+  if self.st.washitat and self.st.washitat > time_global() then
     return false
   end  
-  return blowout>=2 and (not self.st.nohide)
+  return ( blowout >= 2 and ( not self.st.nohide ) )
 end
+
 
 class "evaluator_monolith_blowout" (property_evaluator)
 
@@ -124,7 +91,7 @@ end
 
 function evaluator_monolith_blowout:evaluate()
   if amk_mod.blowout_type()>0 then return false end
-  local blowout=amk.load_variable("blowout",0)
+  local blowout=get_blowout_step()
   return blowout==3
 end
 
@@ -137,7 +104,7 @@ end
 function evaluator_preblowout:evaluate()
   if amk_mod.blowout_type()>0 then return false end
   local npc=self.object
-  local blowout=amk.load_variable("blowout",0)
+  local blowout=get_blowout_step()
   return blowout==1
 end
 
@@ -160,7 +127,7 @@ function evaluator_outside:evaluate()
   end
   self.st.washitat=nil
   if amk_mod.blowout_type()>0 then return false end
-  local blowout=amk.load_variable("blowout",0)
+  local blowout=get_blowout_step()
   if blowout>=2 then
     if self.st.nohide then
       -- Если укрытие невозможно найти, то игнорируем выброс
@@ -214,31 +181,6 @@ function evaluator_outside:evaluate()
     return false
   end
 end
-
---[[
-class "action_anomaly" (action_base)
-
-function action_anomaly:__init(st) super(nil,"action_anomaly")
-  self.st=st
-end
-
-function action_anomaly:initialize()
-  action_base.initialize(self)
-  local npc=self.object
-	amk_anoms.syncronize(npc)
-	npc:set_path_type(game_object.level_path)
-	npc:set_detail_path_type(move.line)
-	npc:set_desired_position()
-	npc:set_desired_direction()
-	local lvid=npc:vertex_in_direction(npc:level_vertex_id(),npc:direction(),2)
-	utils.send_to_nearest_accessible_vertex(npc,lvid)
-end
-
-function action_anomaly:execute()
-  action_base.execute(self)
-  local npc=self.object
-end
-]]
 
 class "action_runtohide" (action_base)
 

@@ -1,5 +1,11 @@
 -- -*- mode: lua; coding: windows-1251-dos -*-
 --схема удаления трупов сталкеров
+
+function attach( sm )
+  sm:subscribe({ signal = "on_before_spawn", fun = this.off_corpses })
+end
+
+
 local tabl_corpses      = {}
 local tabl_corpses_9510 = {}
 local exceptions_9510   = {
@@ -14,12 +20,14 @@ local exceptions_9510   = {
   [  109 ] = true, -- gar_wounded_bandit
   -- трупики в ТД
   [  401 ] = true, -- val_sacrifice_victim
+  [  402 ] = true, -- val_prisoner_captive (Лохматый)
   [  404 ] = true, -- val_sacrifice_guard1
   [  405 ] = true, -- val_sacrifice_guard2
   [  407 ] = true, -- val_escort_guard1
   [  408 ] = true, -- val_escort_guard2
   [  409 ] = true, -- val_sacrifice_tunnel_bandit
   [  424 ] = true, -- Монгол
+  [  519 ] = true, -- Барин в Баре
   [  703 ] = true, -- сумашедший на АС
   -- долговцы из группы Черепа и их противники свободовцы
   [  704 ] = true, -- снайпер на Базе Свободы
@@ -28,6 +36,7 @@ local exceptions_9510   = {
   [  720 ] = true,
   [  721 ] = true,
   [  722 ] = true,
+  [  725 ] = true, -- Угрюмый из кровососовки
   [  736 ] = true,
   [  737 ] = true,
   [  738 ] = true,
@@ -58,15 +67,31 @@ local exceptions_9510   = {
 }
 
 local exceptions_9510_info = {
-  [   33 ] = "esc_tutorial_dead_novice", -- труп у аномалии
-  [  124 ] = "gar_dram_novice_mp5_m1_done", -- труп на Свалке с МП-5 для Юрика
-  [  437 ] = "bar_darklab_document_done", -- труп с зарядами для РПГ в ТД
-  [  450 ] = "dar_password_info1", -- ученый с кодом двери в X-18
-  [  451 ] = "dar_password_info2", -- ученый с кодом двери в X-18
-  [  903 ] = "yan_find_vasilyev_end", -- труп Васильева около вертолета
-  [  918 ] = "yan_has_ghost_pda", -- труп отмычки Призрака в X-16
-  [  922 ] = "bar_deactivate_radar_done", -- военный с лечебным Бериллом на Янтаре
-  [ 9508 ] = "bandit_krisyk_umer", -- Крысюк
+  [    4 ] = { "esc_shustryi_medusa_done" }, -- Шустрый
+  [    5 ] = { "esc_fox_medkit_done" }, -- Лис
+  [    7 ] = { "mil_volk_resiver_done" }, -- Толик
+  [    9 ] = { "esc_petruha_toz_done" }, -- Петруха
+  [   92 ] = { "esc_find_groza_done" }, -- Проводник
+  [   33 ] = { "esc_tutorial_dead_novice" }, -- труп у аномалии
+  [  100 ] = { "val_pula_ammo_done", "seriy_helm", }, -- Серый
+  -- Юрик
+  [  104 ] = {
+    "gar_dram_novice_mp5_m1_done",
+    "gar_dram_novice_burer_hand_done",
+  },
+  -- труп на Свалке с МП-5 для Юрика
+  [  124 ] = { "gar_dram_novice_mp5_m1_done" },
+  [  302 ] = { "agr_krot_PDA_done" }, -- Крот
+  [  422 ] = { "val_sos_give_info" }, -- Мессер
+  [  437 ] = { "bar_darklab_document_done" }, -- труп с зарядами для РПГ в ТД
+  [  450 ] = { "dar_password_info1" }, -- ученый с кодом двери в X-18
+  [  451 ] = { "dar_password_info2" }, -- ученый с кодом двери в X-18
+  [  724 ] = { "mil_fblockpost_quest_reward" }, -- Кэп
+  [  903 ] = { "yan_find_vasilyev_end" }, -- труп Васильева около вертолета
+  [  918 ] = { "yan_has_ghost_pda" }, -- труп отмычки Призрака в X-16
+  -- военный с лечебным Бериллом на Янтаре
+  [  922 ] = { "bar_deactivate_radar_done" },
+  [ 9508 ] = { "bandit_krisyk_umer" }, -- Крысюк
 }
 
 --схема удаления трупов монстров
@@ -99,7 +124,9 @@ function off_corpses()
   end
 
   -- главный цикл
-  local actor_level = level.name()
+  local actor_level           = level.name()
+  local dead_monster_on_level = {}
+  local has_item              = {}
   for a = 1, 65534 do
     local obj = alife():object( a )
     if obj then
@@ -118,8 +145,8 @@ function off_corpses()
         table.insert( tabl_monsters_dead, obj )
 
       -- сталкер
-      elseif IsStalker( obj ) and obj_level ~= actor_level then
-        if not obj:alive() then
+      elseif IsStalker( obj ) then
+        if obj_level ~= actor_level and not obj:alive() then
           -- проверка трупа сталкера, если не в исключениях - в
           -- таблицу и бум удалять
           protected_items.unprotect_tabl_corps_keep( obj )
@@ -143,15 +170,17 @@ function off_corpses()
         end
 
       -- монстр
-      elseif IsMonster( obj ) and obj_level ~= actor_level then
+      elseif IsMonster( obj ) then
+        -- труп
         if not obj:alive() then
-          -- труп
-          table.insert( tabl_monsters_dead, obj )
+          if obj_level == actor_level then
+            dead_monster_on_level[ obj.id ] = obj
+          else
+            table.insert( tabl_monsters_dead, obj )
+          end
         end
-      end
 
-      -- предмет в инвентаре
-      if obj.parent_id then
+      else
         -- валяется на земле
         if obj.parent_id == 65535 then
           -- оружие
@@ -179,9 +208,15 @@ function off_corpses()
               )
               table.insert( tabl_monsters_dead, obj )
             end
+          elseif
+            get_bool( obj_sect, "monster_part", false )
+            and not item_keep( obj )
+          then
+              table.insert( tabl_monsters_dead, obj )
           end
         else
           -- в инвентаре
+          has_item[ obj.parent_id ] = true
           if not parent_keep_items[ obj.parent_id ] and item_keep( obj ) then
             parent_keep_items[ obj.parent_id ] = true
           end
@@ -189,17 +224,14 @@ function off_corpses()
       end
 
       -- фикс кривых smart_terrain
-      if
-        ( IsStalker( obj ) or IsMonster( obj ) )
-        and obj:alive()
-      then
+      if ( IsStalker( obj ) or IsMonster( obj ) ) and obj:alive() then
         local strn_id = obj:smart_terrain_id()
         if strn_id ~= 65535 then
           local strn = alife():object( strn_id )
           if strn and strn:clsid() ~= clsid.smart_terrain then
             log2(
-              "Уборщик: Обнаружена привязка к несуществующему smart_terrain: %s, smart_terrain_id: %s. Привязка удалена.",
-              obj_name, tostring( strn_id )
+              "[%s]: Обнаружена привязка к несуществующему smart_terrain: %s, smart_terrain_id: %s. Привязка удалена.",
+              script_name(), obj_name, tostring( strn_id )
             )
             obj:clear_smart_terrain()
           end
@@ -208,14 +240,21 @@ function off_corpses()
     end
   end -- for
 
-  --зачистка мёртвых монстров
+  -- зачистка мёртвых монстров
   for _, corps in ipairs( tabl_monsters_dead ) do
     if not parent_keep_items[ corps.id ] then
       alife():release( corps, true )
     end
   end
+  
+  -- удаление мертвых мутантов с пустым инвентарем на текущей локации
+  for id, sobj in pairs( dead_monster_on_level ) do
+    if not has_item[ id ] then
+      alife():release( sobj, true )
+    end
+  end
 
-  --зачистка мёртвых человеков
+  -- зачистка мёртвых человеков
   for _, corps in ipairs( tabl_corpses ) do
     if not parent_keep_items[ corps.id ] then
       alife():release( corps, true )
@@ -229,23 +268,25 @@ function off_corpses()
 end
 
 
+local cached_item = {}
 function item_keep( item )
   -- проверка на предметы, тела с которыми нужно оставить
-  if
-    protected_items.obj_is_protected( item, "tabl_items_keep", "like" )
-    or protected_items.is_unique_wpn_keep( item:section_name() )
-    or get_bool( item:section_name(), "quest_item" )
-  then
-    return true
+  local sect = item:section_name()
+  if cached_item[ sect ] == nil then
+    cached_item[ sect ] =
+      get_bool( sect, "quest_item", false )
+      or get_bool( sect, "watcher_act.bad_item", false )
+      or protected_items.obj_is_protected( item, "tabl_items_keep", "like" )
+      or protected_items.is_unique_wpn_keep( sect )
+      or protected_items.obj_is_protected( item, "tabl_wpn_keep", "like" )
   end
-  --проверка по списку оружия
-  return protected_items.obj_is_protected( item, "tabl_wpn_keep", "like" )
+  return cached_item[ sect ]
 end
 
 
 function add_9510_exceptions( sobj )
   local by_info = exceptions_9510_info[ sobj.m_story_id ]
-  if by_info and has_alife_info( by_info ) then
+  if by_info and sak.has_all_info( by_info ) then
     exceptions_9510[ sobj.m_story_id ] = true
   end
 end

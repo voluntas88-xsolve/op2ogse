@@ -4,6 +4,7 @@
 -- например те, у которых имя модуля не начинается на ogse
 addons = {
   "dsh_cfg",
+  "sak_off_corpses",
   "amk_utils",
   "smart_monster_parts",
   "amk",
@@ -85,7 +86,7 @@ addons = {
   "dsh_medkit",
   "meceniy_outfit",
   "dsh_story_agro_final",
-  "dsh_ammo",
+  -- "dsh_ammo",
   "ogse_mental_fix",
 -- компаньоны не используются:  "xr_combat_companion",
   "ogse_night",
@@ -105,7 +106,6 @@ addons = {
   "stco",
   "doc_viewer",
   "akill",
-  "amkii_transmutator",
   "treasure_manager",
   "task_manager",
   "dsh_running_treasure",
@@ -117,9 +117,14 @@ addons = {
   "dsh_underground",
   "dsh_broken_pda",
   "dsh_inv_colors",
+  "gps_habar",
   "netpacket_pda_binder",
   "flamethrower",
   "dsh_bone_protection",
+  "monster_parts",
+  "blowout_scheme",
+  "xr_kamp",
+  "smart_terrain",
 
-  -- "dsh_memuse",
+  "dsh_memuse",
 }

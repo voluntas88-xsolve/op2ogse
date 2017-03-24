@@ -1027,6 +1027,7 @@ function end_af_transform( result, udacha, x, y, z, gv, lv, info, komp, rm_anom,
   if rand_goods > 4 then rand_goods = 4 end
   local sobj = amk_mod.af_transform_universal_end( t )
   if sobj and udacha and not rm_anom then
+    sobj = alife():object( sobj.id )
     local pk = get_netpk( sobj, 1 )
     if pk:isOk() then
       local cnt  = ogse.load_var(
@@ -1035,11 +1036,9 @@ function end_af_transform( result, udacha, x, y, z, gv, lv, info, komp, rm_anom,
       local rnd  = get_next_random( script_name() .. ".end_af_transform.rnd" )
       local data = pk:get()
       data.condition    = ( rand_goods * 0.2 + rnd * 0.2 ) / cnt
-      data.object_flags = bit_and(
-        data.object_flags, bit_not( object_flags.UsedAI_Locations )
-      ) -- снять флаг flUsedAI_Locations
       pk:set( data )
     end
+    sobj:use_ai_locations( false )
   end
 end
 
@@ -1152,6 +1151,20 @@ function create_and_map_treasure( name, descr, sect, pos, lvid, gvid )
 end
 
 
+local fraer_task = {}
+function is_fraer_task_failed()
+  if not ( fraer_task.time and fraer_task.time > time_global() ) then
+    local sobj = alife():object( "sim_stalker_fraer" )
+    if sobj or has_alife_info( "prapor_talk_need" ) then
+      fraer_task.res = false
+    else
+      fraer_task.res = true
+    end
+    fraer_task.time = time_global() + 10000
+  end
+  return fraer_task.res
+end
+
 function can_map_fraer()
   local sobj = alife():object( "sim_stalker_fraer" )
   if sobj then
@@ -1166,12 +1179,11 @@ function take_fraer_spot()
   local sobj = can_map_fraer()
   if sobj then
     local pk = get_netpk( sobj, 1 )
-    if pk:isOk() then
-      local data = pk:get()
-      level.map_add_object_spot_ser(
-        sobj.id, "blue_location", data.character_name
-      )
-    end
+    ASSERT( ( pk and pk:isOk() ), "can't read netpacket of %s", sobj:name() )
+    local data = pk:get()
+    level.map_add_object_spot_ser(
+      sobj.id, "blue_location", data.character_name
+    )
   end
 end
 
@@ -1401,33 +1413,45 @@ function actor_cant_move()
 end
 
 
+local ammo_sections_cache = {}
+function get_ammo_sections( wpn )
+  local sect = wpn:section()
+  if not ammo_sections_cache[ sect ] then
+    local t = {}
+    ammo_sections_cache[ sect ] = t
+    for _, k in ipairs({ "ammo_class", "grenade_class" }) do
+      local s = get_string( sect, k )
+      if s then
+        t[ k ] = parse_names( s )
+      end
+    end
+  end
+  return ammo_sections_cache[ sect ]
+end
+
+
 function get_cur_wpn_ammo( wpn )
   local ammo_sect
-  local gl_status, has_gl = 0, false
+  local has_gl = false
   if wpn:is_weapon_gl() then
-    if
-      ogse_wpn_utils.get_grenade_launcher_status( wpn ) == 2
-      and ogse_wpn_utils.get_grenade_launcher_flag( wpn )
-    then
-      gl_status = 1
-    end
     has_gl = (
       ogse_wpn_utils.get_grenade_launcher_status( wpn ) == 1
-      or gl_status == 1
+      or (
+        ogse_wpn_utils.get_grenade_launcher_status( wpn ) == 2
+        and ogse_wpn_utils.get_grenade_launcher_flag( wpn )
+      )
     )
   end
   if wpn:is_weapon() then
-    local cur_weapon_sec = wpn:section()
-    local ammo1_t, ammo1_n, ammo2_t, ammo2_n =
-      dsh_rukzak.parse_weapon_info_str( dsh_rukzak.get_wpn_info( wpn ) )
+    local wpn_info_s, wpn_info_t = dsh_rukzak.get_wpn_info( wpn )
+    local ammo1_t, ammo1_n, ammo2_t, ammo2_n = unpack( wpn_info_t )
+    local ammo = get_ammo_sections( wpn )
     if has_gl and ogse_wpn_utils.get_gl_mode( wpn ) then
       if ammo2_n > 0 then
-        local ammo_sections = get_names( cur_weapon_sec, "grenade_class" )
-        ammo_sect = ammo_sections[ ammo2_t + 1 ]
+        ammo_sect = ammo.grenade_class[ ammo2_t + 1 ]
       end
     else
-      local ammo_sections = get_names( cur_weapon_sec, "ammo_class" )
-      ammo_sect = ammo_sections[ ammo1_t + 1 ]
+      ammo_sect = ammo.ammo_class[ ammo1_t + 1 ]
     end
   end
   return ammo_sect
@@ -2160,4 +2184,58 @@ end
 function spawn_bland_flash( npc, actor )
   if npc:id() == db.actor:id() then npc = actor end
   amk.spawn_item_in_inv( "bland_flash", npc )
+end
+
+
+function alife_find_and_release( items )
+  local need = {}
+  for _, k in ipairs( items ) do
+    need[ k ] = true
+  end
+  local cnt = table.getn( items )
+  for id = 1, 65534 do
+    local sobj = alife():object( id )
+    if sobj then
+      if need[ sobj:section_name() ] then
+        need[ sobj:section_name() ] = nil
+        cnt = cnt - 1
+        alife():release( sobj )
+        if cnt == 0 then break end
+      end
+    end
+  end
+end
+
+
+function clear_useful_for_ai( sobj )
+  local pk = get_netpk( sobj, 1 )
+  ASSERT( ( pk and pk:isOk() ), "can't read netpacket of %s", sobj:name() )
+  local data = pk:get()
+  data.object_flags = bit_and(
+    data.object_flags, bit_not( object_flags.UsefulForAI )
+  )
+  pk:set( data )
+end
+
+
+function udalyem_molniu()
+  ogse_st_mgr.start_timer(
+    "arhara_dialog.sp_imit_tele_molniy",
+    3,
+    "arhara_dialog.sp_imit_tele_molniy"
+  )
+  ogse_st_mgr.start_timer(
+    "arhara_dialog.dell_molniy",
+    5.5,
+    "arhara_dialog.dell_molniy"
+  )
+  ogse_st_mgr.start_timer(
+    script_name() .. ".portal_na_mg",
+    20.5,
+    script_name() .. ".portal_na_mg"
+  )
+end
+
+function portal_na_mg()
+  db.actor:give_info_portion( "portal_na_mg" )
 end

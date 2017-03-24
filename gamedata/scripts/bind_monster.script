@@ -206,7 +206,6 @@ end
 
 function generic_object_binder:death_callback( victim, who )
   if not self.object then self.object = victim end
-  kostya_dialog.kuv_hit( who )
   db.del_monster( self.object ) -- убираем из онлайн-живых
 
   if db.actor then
@@ -247,6 +246,16 @@ function generic_object_binder:death_callback( victim, who )
   h.power     =  1
   h.impulse   = 10
   self.object:hit( h )
+
+  dsh.timeout( 5000, function( id )
+    local obj = level.object_by_id( id )
+    if obj then
+      local ps = obj:get_physics_shell()
+      if ps then
+        ps:apply_force( 0, obj:mass() * 100, 0 )
+      end
+    end
+  end, self.object:id() )
 
   --AMK UTILS--
   amk.on_death( victim, who )
@@ -308,7 +317,6 @@ end
 
 
 function generic_object_binder:hit_callback( obj, amount, local_direction, who, bone_index )
-  kostya_dialog.kuv_hit( who )
   if self.st and self.st.active_section then
     xr_logic.issue_event(
       self.object, self.st[ self.st.active_scheme ], "hit_callback", obj,
@@ -504,8 +512,6 @@ function generic_object_binder:use_callback( obj, who )
         self.object, self.st[ self.st.active_scheme ], "use_callback", obj, who
       )
     end
-  else
-    monster_parts.on_monster_use( obj, who ) -- обыск трупа
   end
   event( "npc_used" ):trigger({ obj = self.object, who = who })
   self.am:call( "npc_use", self.object, who )

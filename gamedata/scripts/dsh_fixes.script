@@ -125,6 +125,14 @@ function on_first_update()
     this.fix_dsh_ogse_relations,
     this.fix_dsh_deadmans_table_proxy,
     this.fix_dark_bland,
+    this.fix_netpacket_pda,
+    this.fix_amk_transmutator,
+    this.fix_anim_ph_zone_0004,
+    this.fix_sak_flash,
+    this.fix_mozg,
+    this.fix_wpn_gungauss,
+    this.fix_info_restriction,
+    this.fix_vasily_chertez_reminder,
   }
   local version = ogse.load_var( vname, 0 )
   if version < table.getn( fixes ) then
@@ -2045,5 +2053,151 @@ function fix_dark_bland( ver )
     log2( "[%s]: respawn %s", script_name(), sobj:name() )
     alife():release( sobj )
     sobj = alife():create( alife():spawn_id( story_ids.dark_bland ) )
+  end
+end
+
+
+function fix_netpacket_pda( ver )
+  if ver == 0 then return end
+  local t = {}
+  amk_utils.inventory_iterate_section(
+    "netpacket_pda",
+    function( obj )
+      table.insert( t, obj )
+    end
+  )
+  if table.getn( t ) > 0 then
+    log2(
+      "[%s]: found %s netpacket_pda, deleting...",
+      script_name(), table.getn( t )
+    )
+    for _, obj in ipairs( t ) do
+      ogse.remove_item_from_inventory( obj )
+    end
+  end
+  amk.del_variable( "have_netpacket_pda" )
+end
+
+
+function fix_amk_transmutator( ver )
+  if ver == 0 then return end
+  local obj = db.actor:object( "amk_transmutator" )
+  if not obj then return end
+  log2( "[%s]: found %s, deleting...", script_name(), obj:name() )
+  ogse.remove_item_from_inventory( obj )
+  sak.create_items_actor( "ammo_5.45x39_ap",  5 )
+  sak.create_items_actor( "ammo_7.62x39_ap",  5 )
+  sak.create_items_actor( "medkit_army",     10 )
+end
+
+
+function fix_anim_ph_zone_0004( ver )
+  local sobj = alife():object( "anim_ph_zone_0004" )
+  if sobj then
+    log2( "[%s]: found %s, removing...", script_name(), sobj:name() )
+    alife():release( sobj )
+  end
+end
+
+
+function fix_sak_flash( ver )
+  if ver == 0 then return end
+  if
+    db.actor:has_info( "sak_reward_outfit_have" )
+    or db.actor:has_info( "sak_reward_outfit_done" )
+  then
+    return
+  end
+  if db.actor:has_info( "sak_reward_outfit_start" ) then
+    local found = false
+    for id = 1, 65534 do
+      local sobj = alife():object( id )
+      if sobj and sobj:section_name() == "disk_flash" then
+        found = true
+        break
+      end
+    end
+    if not found then
+      log2( "[%s]: disk_flash not found, spawning...", script_name() )
+      sak_dialog.take_sak_reward_outfit()
+    end
+  end
+end
+
+
+function fix_mozg( ver )
+  if ver == 0 then return end
+  if not db.actor:has_info( "svoboda_lukash_start" ) then return end
+  local found = {}
+  for id = 1, 65534 do
+    local sobj = alife():object( id )
+    if sobj and sobj:section_name() == "mozg" then
+      found[ object_level_name( sobj ) ] = true
+    end
+  end
+  if
+    not (
+      db.actor:has_info( "svoboda_lukash_done" )
+      or found.atp_for_test22
+    )
+  then
+    log2(
+      "[%s]: mozg on atp_for_test22 not found, spawning...", script_name()
+    )
+    arhara_dialog.mozg_atp_for_test22()
+  end
+  if not found.l12_stancia_2 then
+    log2(
+      "[%s]: mozg on l12_stancia_2 not found, spawning...", script_name()
+    )
+    arhara_dialog.mozg_l12_stancia_2()
+  end
+end
+
+
+function fix_wpn_gungauss( ver )
+  if ver == 0 then return end
+  for id = 1, 65534 do
+    local sobj = alife():object( id )
+    if sobj and sobj:section_name() == "wpn_gungauss" then
+      log2(
+        "[%s]: clearing UsefulForAI flag for %s...",
+        script_name(), sobj:name()
+      )
+      dsh.clear_useful_for_ai( sobj )
+    end
+  end
+end
+
+
+function fix_info_restriction()
+  if ver == 0 then return end
+  if
+    db.actor:has_info( "arhara_shaxter_start" )
+    and not db.actor:has_info( "info_restriction" )
+  then
+    log2( "[%s]: fixing info_restriction...", script_name() )
+    spawn_teleport.spawn_teleport1()
+    spawn_teleport.spawn_teleport2()
+    spawn_teleport.spawn_teleport3()
+    spawn_teleport.spawn_teleport5()
+    spawn_teleport.spawn_teleport7()
+    spawn_teleport.spawn_teleport9()
+    spawn_restrictor.create_sr1()
+    spawn_restrictor.create_sr2()
+    spawn_teleport.spawn_item1()
+    db.actor:give_info_portion( "info_restriction" )
+  end
+end
+
+
+function fix_vasily_chertez_reminder( ver )
+  if ver == 0 then return end
+  if
+    db.actor:has_info( "vasily_chertez_start" )
+    and not db.actor:has_info( "vasily_chertez_reminder" )
+  then
+    log2( "[%s]: fixing vasily_chertez_reminder...", script_name() )
+    db.actor:give_info_portion( "vasily_chertez_reminder" )
   end
 end

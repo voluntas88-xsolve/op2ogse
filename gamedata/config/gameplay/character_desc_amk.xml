@@ -114,7 +114,7 @@
 	<supplies>
 	[spawn] \n
 	wpn_groza \n
-	ammo_9x39_pab9 \n
+	ammo_9x39_ap \n
 	device_torch \n
 	#include "gameplay\character_drugs.xml" \n
 	#include "gameplay\character_food.xml"
@@ -658,8 +658,8 @@
 	  	<crouch_type>0</crouch_type>
         <supplies>
         [spawn] \n
-        wpn_hk417_camo \n
-        ammo_7.62x51_ap \n
+        wpn_svu \n
+        ammo_7.62x54_ap \n
         grenade_f1 \n
 		device_torch \n
 		#include "gameplay\character_drugs.xml" \n
@@ -740,7 +740,7 @@
 	  	<crouch_type>0</crouch_type>
         <supplies>
         [spawn] \n
-        wpn_m4_a3 = 1, scope, wpn_addon_grenade_launcher_m203 \n
+        wpn_m4_a3 = 1, scope, launcher \n
         ammo_5.56x45_gd \n
 		ammo_m209 \n
         grenade_f1 \n
@@ -849,7 +849,7 @@
 	  	<crouch_type>0</crouch_type>
         <supplies>
         [spawn] \n
-		wpn_g41 = 1, wpn_hensoldt_scope \n
+		wpn_g41 = 1, scope \n
         ammo_5.56x45_gd \n
 		#include "gameplay\character_drugs.xml" \n
 		#include "gameplay\character_food.xml"
@@ -876,8 +876,8 @@
 	  	<crouch_type>0</crouch_type>
         <supplies>
         [spawn] \n
-		wpn_hk417_sk1 \n
-        ammo_7.62x51_ap \n
+		wpn_svu \n
+        ammo_7.62x54_ap \n
 		camouflage = 1 \n
 		#include "gameplay\character_drugs.xml" \n
 		#include "gameplay\character_food.xml"
@@ -1050,7 +1050,7 @@
   		<crouch_type>-1</crouch_type>
         <supplies>
         [spawn] \n
-        wpn_ak108 = 1, wpn_addon_sil_556_ar \n
+        wpn_ak108 = 1, silencer \n
         ammo_5.56x45_ap \n
 		wpn_mp444 \n
 		ammo_9x18_pmm \n
@@ -1720,7 +1720,7 @@
 	  	<crouch_type>0</crouch_type>
         <supplies>
         [spawn] \n
-        wpn_xm8_para_sk2 \n
+        wpn_g36 \n
         ammo_5.56x45_ap \n
 		device_pda_npc = 1 \n
 		mutant_burer_cocoon = 1 \n
@@ -2086,6 +2086,7 @@
 	<visual>actors\novice\green_stalker_11</visual>
 	<supplies>
 	[spawn] \n
+	wpn_vepr \n
 	ammo_12x76_zhekan \n
 	grenade_f1 \n
 	#include "gameplay\character_food.xml" \n

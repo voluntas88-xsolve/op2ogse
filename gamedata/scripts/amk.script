@@ -5,6 +5,7 @@
 function attach( sm )
   sm:subscribe({ signal = "on_npc_death",  fun = this.on_npc_death    })
   sm:subscribe({ signal = "on_npc_spawn",  fun = this.npc_spawn_event })
+  sm:subscribe({ signal = "on_save",       fun = this.save_changed_variables })
 end
 
 
@@ -282,13 +283,15 @@ function remove_timer( name )
     ogse_st_mgr.get_timer( tn ):stop()
   else
     local timers = load_table( "timers" )
-    for i = table.getn( timers ), 1, -1 do
-      if timers[ i ][ 1 ] == name then
-        table.remove( timers, i )
-        break
+    if table.getn( timers ) > 0 then
+      for i = table.getn( timers ), 1, -1 do
+        if timers[ i ][ 1 ] == name then
+          table.remove( timers, i )
+          break
+        end
       end
+      save_table( "timers", timers )
     end
-    save_table( "timers", timers )
   end
 end
 
@@ -311,17 +314,6 @@ function emergency_cleanup()
   emerg_store.timers = load_table("timers")
 	--dump_table(emerg_store.timers)
   del_variable("timers")
-  --[[for i=1,100,1 do
-    if load_variable("gt"..i,"")=="af_transform" then
-      emerg_store[i]={}
-      emerg_store[i].gt=load_variable("gt"..i,"")
-      emerg_store[i].gd=load_variable("gd"..i,"")
-      emerg_store[i].gp=load_variable("gp"..i,"")
-      del_variable("gt"..i)
-      del_variable("gd"..i)
-      del_variable("gp"..i)
-    end
-  end]]
   save_variable("emerg",true)
 end
 
@@ -330,15 +322,6 @@ function emergency_restore()
 	if emerg_store.zombied then
 		save_table("zombied", emerg_store.zombied)
 	end
---[[  for k,v in pairs(emerg_store) do
-    if k=="zombied" then
-      save_table(k,v)
-    else
-      save_variable("gt"..k,v.gt)
-      save_variable("gd"..k,v.gd)
-      save_variable("gp"..k,v.gp)      
-    end
-  end]]
   --get_console():execute("load ~~~ TIMERS emergency_restore")
   save_table("timers", emerg_store.timers)
   del_variable("emerg")
@@ -383,9 +366,6 @@ function convert_timers()
         del_variable("x_timer_"..a)
         del_variable("x_timer_"..a.."_delay")
         del_variable("x_timer_"..a.."_params")
-			--[[        save_variable("xt"..a,name)
-        save_variable("xd"..a,delay)
-			save_variable("xp"..a,params)]]
       end
 		-- старые таймеры
 		name = load_variable("xt"..a, nil)
@@ -417,9 +397,6 @@ function convert_timers()
         del_variable("x_gtimer_"..a)
         del_variable("x_gtimer_"..a.."_delay")
         del_variable("x_gtimer_"..a.."_params")
-			--[[        save_variable("gt"..a,name)
-        save_variable("gd"..a,delay)
-			save_variable("gp"..a,params)]]
       end
 		-- старые таймеры
 		name = load_variable("gt"..a, nil)
@@ -1068,42 +1045,57 @@ function check_game()
   return false
 end
 
---записываем переменную
-function save_variable(variable_name, value)
-  if value==nil then
-    amk.mylog("saving nil into "..variable_name)
-    del_variable(variable_name)
+
+-- записываем переменную
+local amk_vars = script_name() .. ".vars."
+local changed_amk_vars = {}
+
+function save_variable( variable_name, value )
+  if value == nil then
+    del_variable( variable_name )
   else
-    local vn=compress_name(variable_name)
-    xr_logic.pstor_store(db.actor, vn, value)
+    changed_amk_vars[ variable_name ] = value
   end
 end
 
---загружаем переменную
-function load_variable(variable_name, value_if_not_found)
-  local vn=compress_name(variable_name)
-  return xr_logic.pstor_retrieve(db.actor, vn, value_if_not_found)
-end
 
---есть ли переменная
-function has_variable(variable_name)
-  local vn=compress_name(variable_name)
-  local npc_id = xr_logic.get_pda_id(vn,"проверяем")
-  return db.storage[npc_id].pstor[vn] ~= nil
-end
-
---удаляем переменную
-function del_variable(variable_name)
-  local vn=compress_name(variable_name)
-  local npc_id = xr_logic.get_pda_id(vn,"удаляем")
---[[  if db.storage[db.actor:id()].pstor[vn] then
-    db.storage[db.actor:id()].pstor[vn] = nil
-  end]]
-    if db.storage[npc_id].pstor[vn] then
-    db.storage[npc_id].pstor[vn] = nil
-    load_table_cache[variable_name] = nil
+function save_changed_variables()
+  local cnt = 0
+  for k, v in pairs( changed_amk_vars ) do
+    ogse.save_var( amk_vars .. k, v )
+    changed_amk_vars[ k ] = nil
+    cnt = cnt + 1
   end
+  log2( "[%s]: %s changed variables saved", script_name(), cnt )
 end
+
+
+-- загружаем переменную
+function load_variable( variable_name, value_if_not_found )
+  local value
+  if changed_amk_vars[ variable_name ] then
+    value = changed_amk_vars[ variable_name ]
+  else
+    value = ogse.load_var_safe( amk_vars .. variable_name )
+    if value == nil then value = value_if_not_found end
+  end
+  return value
+end
+
+
+-- есть ли переменная
+function has_variable( variable_name )
+  return ogse.var_exists( amk_vars .. variable_name )
+end
+
+
+-- удаляем переменную
+function del_variable( variable_name )
+  ogse.delete_var( amk_vars .. variable_name )
+  changed_amk_vars[ variable_name ] = nil
+  load_table_cache[ variable_name ] = nil
+end
+
 
 -- таблица компрессии имён
 local compress_table={
@@ -1387,7 +1379,6 @@ end
 --колбэк на потерю предмета из инвентаря ГГ
 function on_item_drop(obj)
 gps_habar.on_item_drop(obj) --idler++--
-  mod_call("check_for_af_drop",obj)
   mod_call("check_for_item_drop",obj)
 end
 
@@ -1477,7 +1468,6 @@ end
 
 --колбэк на смерть непися
 function on_death(victim, who)
-	amk_anoms.unreg_in_anom_manager(victim)
   mod_call("generate_recipe",victim,who)
 	mod_call("zomby_blow",victim)
 end

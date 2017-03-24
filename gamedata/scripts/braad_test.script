@@ -1,6 +1,9 @@
 -- -*- mode: lua; coding: windows-1251-dos -*-
 
 function attach( sm )
+  sm:subscribe({
+    signal = "on_before_spawn_another_level", fun = this.false_info
+  })
   if not has_alife_info( "actor_in_forest" ) then
     sm:subscribe({ signal = "on_spawn", fun = this.actor_in_forest })
   end
@@ -13,31 +16,32 @@ function attach( sm )
 end
 
 
-function false_info()
-	local ln = level.name()
-	local actor = db.actor
-	if ln=="l03u_agr_underground" and actor:has_info("yakut_false_start") then
-		actor:give_info_portion("yakut_false_have")
-	elseif ln=="l03_agroprom" and actor:has_info("yakut_false_have") then
-		actor:give_info_portion("yakut_false_done")
-	elseif ln=="l06_rostok" and actor:has_info("zahar_naemnik_start") then
-		actor:give_info_portion("zahar_naemnik_begin")
-	--elseif ln=="l02_garbage" and actor:has_info("voen_document_est") then
-	--actor:give_info_portion("bandranen_pda_need")
-	--elseif ln=="l02_garbage" and actor:has_info("bandranen_pda_est") then
-	--actor:give_info_portion("fraer_pda_need")
-	--elseif actor:has_info("fraer_pda_est") then actor:give_info_portion("prapor_talk_need")
-	--elseif ln=="l07_military" and actor:has_info("barrem_talk_est") then
-	--actor:give_info_portion("ara_pda_need")
-	--elseif ln=="l07_military" and actor:has_info("ara_pda_est") then
-	--actor:give_info_portion("siv_pda_need")
-	--elseif actor:has_info("siv_pda_est") then actor:give_info_portion("sah_talk_need")
-	elseif ln=="l10u_bunker" and actor:has_info("ucen_talk_need") then
-		actor:give_info_portion("ucen_talk_spawn")
-	elseif ln=="l01_escape" and actor:has_info("prizrak_finalzver_start") then
-		actor:give_info_portion("info_spawn_zver")
+function false_info( ln, prev_ln )
+  local actor = db.actor
+  if
+    ln == "l03u_agr_underground"
+    and actor:has_info( "yakut_false_start" )
+  then
+    actor:give_info_portion( "yakut_false_have" )
+  elseif
+    prev_ln == "l03u_agr_underground" and actor:has_info( "yakut_false_have" )
+  then
+    actor:give_info_portion( "yakut_false_done" )
+  elseif
+    ln == "l06_rostok" and actor:has_info( "zahar_naemnik_start" )
+  then
+    actor:give_info_portion( "zahar_naemnik_begin" )
+  elseif
+    ln == "l10u_bunker" and actor:has_info( "ucen_talk_need" )
+  then
+    actor:give_info_portion( "ucen_talk_spawn" )
+  elseif
+    ln == "l01_escape" and actor:has_info( "prizrak_finalzver_start" )
+  then
+    actor:give_info_portion( "info_spawn_zver" )
+  end
 end
-end
+
 
 function checking_use_item(obj)
 	local ln = level.name()
@@ -240,7 +244,7 @@ local npc,obj
         end
     end
 	sim:create("wpn_mp5",obj.position,obj.m_level_vertex_id,obj.m_game_vertex_id,obj.id)
-	sim:create("wpn_val",obj.position,obj.m_level_vertex_id,obj.m_game_vertex_id,obj.id)
+	sim:create("wpn_val_pso1",obj.position,obj.m_level_vertex_id,obj.m_game_vertex_id,obj.id)
 	sim:create_ammo("ammo_5.56x45_ss190",obj.position,obj.m_level_vertex_id,obj.m_game_vertex_id,obj.id,30)
 end
 
@@ -1451,50 +1455,51 @@ function drop_actor(obj)
    end 
 end
 
-function start(first_speaker, second_speaker)
-	local actor, trader
-	if db.actor and db.actor:id() == first_speaker:id() then
-		actor = first_speaker
-		trader = second_speaker
-	else
-		actor = second_speaker
-		trader = first_speaker
-	end
-	dialogs.relocate_item_section(trader, "glushitel", "out")	
-	local gtime = amk.game_minutes()
-	amk.save_variable("glushitel_reload", gtime + 300)
---	clear_glushitel(actor)
+
+function start( first_speaker, second_speaker )
+  local actor, trader
+  if db.actor and db.actor:id() == first_speaker:id() then
+    actor  = first_speaker
+    trader = second_speaker
+  else
+    actor  = second_speaker
+    trader = first_speaker
+  end
+  dialogs.relocate_item_section( trader, "glushitel", "out" )
+  ogse_st_mgr.start_gtimer(
+    script_name() .. ".start", 5 * 3600, script_name() .. ".glushitel_ready"
+  )
+  ogse.save_var( script_name() .. ".glushitel_reload", true, "bool" )
 end
 
-function is_reload_ready(first_speaker, second_speaker)
-	local gtime = amk.game_minutes()
-	local ftime = amk.load_variable("glushitel_reload", 0)
-	if gtime >= ftime then
-		return true
-	else
-		return false
-	end
+
+function glushitel_ready()
+  ogse.save_var( script_name() .. ".glushitel_reload", false, "bool" )
 end
 
-function is_reload_not_ready(first_speaker, second_speaker)
-	local gtime = amk.game_minutes()
-	local ftime = amk.load_variable("glushitel_reload", 0)
-	if gtime <= ftime then
-		return true
-	else
-		return false
-	end
+
+function is_reload_ready()
+  return ogse.load_var_safe( script_name() .. ".glushitel_reload" ) == false
 end
 
-function clear_glushitel(person)
-	if person and person:object("glushitel") then
-		alife():release(alife():object(person:object("glushitel"):id()), true)
-	end
+
+function is_reload_not_ready()
+  return ogse.load_var_safe( script_name() .. ".glushitel_reload" ) == true
 end
 
-function clear_reload(first_speaker, second_speaker)
-	amk.del_variable("glushitel_reload")
+
+function clear_glushitel( person )
+  if person and person:object( "glushitel" ) then
+    alife():release( alife():object( person:object( "glushitel" ):id() ), true )
+  end
 end
+
+
+function clear_reload()
+  ogse.delete_var( script_name() .. ".glushitel_reload" )
+  amk.del_variable( "glushitel_reload" )
+end
+
 
 function start_kalmyak(first_speaker, second_speaker)
 	local gtime = amk.game_minutes()
@@ -1658,40 +1663,67 @@ local npc,obj
     end
 end
 
+
 function spawn_prohod_lim()
-    if not db.actor:has_info("info_spawn_lim_teleport") then 
-local se_obj = alife():create("lim_zone_teleport1",vector():set(40.821,11.0686,215.0173),48310,3020)
-xr_logic.pstor_store(db.actor, "lim_zone_teleport1", se_obj.id) 
-local se_obj = alife():create("lim_zone_teleport2",vector():set(49.1074,2.948,300.0252),51380,3022)
-xr_logic.pstor_store(db.actor, "lim_zone_teleport2", se_obj.id)
-    db.actor:give_info_portion("info_spawn_lim_teleport")
-	end
+  if not db.actor:has_info( "info_spawn_lim_teleport" ) then 
+    local se_obj = alife():create(
+      "lim_zone_teleport1",
+      vector():set( 40.821, 11.0686, 215.0173 ), 48310, 3020
+    )
+    xr_logic.pstor_store( db.actor, "lim_zone_teleport1", se_obj.id ) 
+    se_obj = alife():create(
+      "lim_zone_teleport2",
+      vector():set( 49.1074, 2.948, 300.0252 ), 51380, 3022
+    )
+    xr_logic.pstor_store( db.actor, "lim_zone_teleport2", se_obj.id )
+    db.actor:give_info_portion( "info_spawn_lim_teleport" )
+  end
 end
 
-function drop_lim(obj)
-   if obj:section() == "nebo_clear" and db.actor:has_info("nebo_kurier_del") then
-       del_lim()
-      alife():release(alife():object(obj:id()))
---	  amk.remove_item(obj)
-   end 
+
+function drop_lim( obj )
+  if not level.get_inventory_wnd():IsShown() then return end
+  if
+    obj:section() == "nebo_clear"
+    and db.actor:has_info( "nebo_kurier_del" )
+  then
+    del_lim()
+    local sobj = alife():object( obj:id() )
+    if sobj then
+      alife():release( sobj )
+    end
+  end
 end
 
 
 function del_lim()
-    if not db.actor:has_info("info_del_lim_teleport") then 
-local obj_id = xr_logic.pstor_retrieve(db.actor, "lim_zone_teleport1", -1, true)
-local se_obj = alife():object(obj_id)
-        if se_obj then
-          alife():release(se_obj, true)
-        end
-local obj_id = xr_logic.pstor_retrieve(db.actor, "lim_zone_teleport2", -1, true)
-local se_obj = alife():object(obj_id)
-        if se_obj then
-          alife():release(se_obj, true)
-        end	
-	db.actor:give_info_portion("info_del_lim_teleport")
-	end
-end 
+  if not db.actor:has_info( "info_del_lim_teleport" ) then
+    local obj_id = xr_logic.pstor_retrieve(
+      db.actor, "lim_zone_teleport1", -1, true
+    )
+    local se_obj = alife():object( obj_id )
+    local release_items = {}
+    if se_obj then
+      alife():release( se_obj, true )
+    else
+      table.insert( release_items, "lim_zone_teleport1" )
+    end
+    obj_id = xr_logic.pstor_retrieve(
+      db.actor, "lim_zone_teleport2", -1, true
+    )
+    se_obj = alife():object( obj_id )
+    if se_obj then
+      alife():release( se_obj, true )
+    else
+      table.insert( release_items, "lim_zone_teleport2" )
+    end
+    if table.getn( release_items ) > 0 then
+      dsh.alife_find_and_release( release_items )
+    end
+    db.actor:give_info_portion( "info_del_lim_teleport" )
+  end
+end
+
 
 function speech_teleport()
 news_manager.send_tip(db.actor,"%c[255,160,160,160]".."—¬»ЅЋќ¬:".."\\n".."%c[255,255,128,128]ћеченый, есть дело срочное, жду теб€.",nil,nil,30000)  

@@ -9,7 +9,7 @@
 -----------------------------------------------------------------------
 local excluded_npc = {
   [ 29 ] = true,                -- учебная плоть блин
-  [ "bar_ecolog_professor" ] = true,
+  -- [ "bar_ecolog_professor" ] = true,
   [ "dik_the_drifter"      ] = true,
   [ "zona_brother1"        ] = true,
   [ "zona_brother2"        ] = true,
@@ -21,18 +21,26 @@ local excluded_npc = {
 }
 
 local excluded_sect = {
-  [ "anim_ph_"     ] = true,
-  [ "burning_fuzz" ] = true,
-  [ "zone_rad"     ] = true,
+  "anim_ph_",
+}
+
+local monster_excluded_sect = {
+  "amk_zone_radioactive_",
 }
 
 local excluded_comms = {        -- запретные коммунити
   [ "zombied" ] = true,
-  [ "trader"  ] = true,
 }
 
 local excluded_locations = {
   -- [ "l03u_agr_underground" ] = true,
+}
+
+local excluded_by_name = {
+  -- Росток, электры в тоннеле
+  [ "amk_zone_witches_galantine_180" ] = true,
+  [ "rostok_zone_witches_galantine_average" ] = true,
+  [ "rostok_zone_witches_galantine_average_0000" ] = true,
 }
 
 local added_restrictions = {}
@@ -115,7 +123,6 @@ end
 
 function remove_restriction( npc, anomid )
   local sobj = alife():object( anomid )
-  amk_anoms.set_anomaly_status( sobj, "del" )
   for npc_id, anoms in pairs( added_restrictions ) do
     local npc_obj = level.object_by_id( npc_id )
     if npc_obj and anoms[ anomid ] then
@@ -123,6 +130,7 @@ function remove_restriction( npc, anomid )
       npc_obj:remove_restrictions( "", sobj:name() )
     end
   end
+  alife():release( sobj )
 end
 
 
@@ -139,7 +147,7 @@ function cleanup( obj )
     end
     if table.getn( restrs ) > 0 then
       local s = table.concat( restrs, "," )
-      ASSERT( s:len() < 4096, "too long: %s", s:len() )
+      ASSERT( s:len() < 3072, "too long: %s", s:len() )
       obj:remove_restrictions( "", s )
     end
     added_restrictions[ nid ] = nil
@@ -150,11 +158,12 @@ end
 
 -- как часто выполнять обход аномалий (в мс) и в каком радиусе
 -- запоминать аномалии.
-local freq, detect_radius = 1000, 100
+local freq, detect_radius = 1000, 50
+local is_blowout = false
 
-function update_norm( obj )
+function update_norm( obj )  
   ogse_signals.get_mgr():reschedule( freq + math.random( freq ) )
-
+  if is_blowout then return end
   local curr_pos = obj:position()
   local prev_pos = last_position[ obj:id() ]
   if prev_pos then
@@ -174,13 +183,23 @@ function update_norm( obj )
   local restr = {}
   for _, o in ipairs( amk_anoms.get_anomaly_list( obj, detect_radius ) ) do
     local sobj = alife():object( o.id )
-    if sobj and amk_anoms.get_anomaly_status( sobj ) ~= "del" then
+    if sobj then
       local sect_anom = sobj:section_name()
-      local ignore    = false
-      for k, v in pairs( excluded_sect ) do
-        if string.find( sect_anom, k ) then
-          ignore = true
-          break
+      local ignore    = ( excluded_by_name[ sobj:name() ] ~= nil )
+      if not ignore then
+        for _, k in ipairs( excluded_sect ) do
+          if string.find( sect_anom, k, 1, true ) then
+            ignore = true
+            break
+          end
+        end
+      end
+      if obj:is_monster() and not ignore then
+        for _, k in ipairs( monster_excluded_sect ) do
+          if string.find( sect_anom, k, 1, true ) then
+            ignore = true
+            break
+          end
         end
       end
       if not ignore then
@@ -202,7 +221,7 @@ function update_norm( obj )
       added_restrictions[ obj:id() ][ k ] = nil
     end
     local s = table.concat( del, "," )
-    ASSERT( s:len() < 4096, "too long: %s", s:len() )
+    ASSERT( s:len() < 3072, "too long: %s", s:len() )
     obj:remove_restrictions( "", s )
   end
 
@@ -210,13 +229,36 @@ function update_norm( obj )
   for k, _ in pairs( restr ) do
     if not should_npc_miss_this_anomaly( obj ) then
       table.insert( add, k )
-      added_restrictions[ obj:id() ][ k ] = true
     end
   end
   if table.getn( add ) > 0 then
     local s = table.concat( add, "," )
-    ASSERT( s:len() < 4096, "too long: %s", s:len() )
-    obj:add_restrictions( "", s )
+    if obj:in_restrictions():len() + 1 + s:len() < 3072 then
+      obj:add_restrictions( "", s )
+      for _, k in ipairs( add ) do
+        added_restrictions[ obj:id() ][ k ] = true
+      end
+    else
+      log2(
+        "[%s]: %s: in_restrictions is too long: %s, %s",
+        script_name(), obj:name(), obj:in_restrictions():len(), s:len()
+       )
+      log2(
+        "[%s]: %s: in_restrictions() = %s",
+        script_name(), obj:name(), obj:in_restrictions()
+       )
+      log2(
+        "[%s]: change detect radius: %s -> %s",
+        script_name(), detect_radius, detect_radius * 0.75
+       )
+       detect_radius = detect_radius * 0.75
+      log2(
+        "[%s]: change detect freq:   %s -> %s",
+        script_name(), freq, freq * 0.75
+       )
+       freq = freq * 0.75
+       ogse_signals.get_mgr():reschedule( 200 )
+    end
   end
 end
 
@@ -266,6 +308,7 @@ end
 
 
 function pre_blow_off()
+  is_blowout = true
   for id, _ in pairs( added_restrictions ) do
     local obj = level.object_by_id( id )
     if obj then
@@ -276,6 +319,7 @@ end
 
 
 function on_after_blowout()
+  is_blowout    = false
   last_position = {}
   remember_generated_anomalies()
 end
@@ -284,8 +328,8 @@ end
 function on_anomaly_spawn( obj, binder )
   if known_anomaly[ obj:id() ] then return end
   local sect = obj:section()
-  for k, _ in pairs( excluded_sect ) do
-    if string.find( sect, k ) then return end
+  for _, k in ipairs( excluded_sect ) do
+    if string.find( sect, k, 1, true ) then return end
   end
   known_anomaly[ obj:id() ] = true
   local pos    = obj:position()
@@ -294,7 +338,19 @@ function on_anomaly_spawn( obj, binder )
   for id, _ in pairs( last_position ) do
     local npc = level.object_by_id( id )
     if npc then
-      if npc:position():distance_to( pos ) - radius < detect_radius then
+      local ignore = false
+      if npc:is_monster() then
+        for _, k in ipairs( monster_excluded_sect ) do
+          if string.find( sect, k, 1, true ) then
+            ignore = true
+            break
+          end
+        end
+      end
+      if
+        ( not ignore )
+        and npc:position():distance_to( pos ) - radius < detect_radius
+      then
         table.insert( recalc, id )
       end
     end
@@ -307,4 +363,9 @@ end
 
 function on_anomaly_net_destroy( obj, binder )
   known_anomaly[ obj:id() ] = nil
+end
+
+
+function get_freq()
+  return freq
 end

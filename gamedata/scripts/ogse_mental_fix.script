@@ -39,18 +39,18 @@ function check_mental( obj )
   local mental  = state_lib.states[ storage.target_state ].mental
   if binder[ script_name() .. ".check_mental" ] then
     if mental and mental == anim.panic then
-      log1(
-        "!!ERROR! NPC " .. obj:name()
-        .. " is in panic more than 25 seconds! Trying to recover!"
+      log2(
+        "[%s]: %s is in panic more than 25 seconds! Trying to recover!",
+        script_name(), obj:name()
       )
       obj:set_mental_state( anim.danger )
     end
     binder[ script_name() .. ".check_mental" ] = nil
   else
     if mental and mental == anim.panic then
-      log1(
-        "~~WARNING! NPC " .. obj:name()
-        .. " is in panic - will check it for freezing."
+      log2(
+        "[%s]: %s is in panic - will check it for freezing.",
+        script_name(), obj:name()
       )
       binder[ script_name() .. ".check_mental" ] = true
       ogse_signals.get_mgr():reschedule( 25000 )

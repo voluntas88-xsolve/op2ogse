@@ -54,13 +54,12 @@ function actor_binder:net_spawn( data )
   amk.on_game_load( obj )
 --  xr_gulag.make_restrictors_registry()
   sak.add_tail()
-  braad_test.false_info()
   meceniy_work.main()
   spawn_level_changer.remove_old_teleport()
   -- kostya_level --
   spawn_teleport.spawn_teleport_exit()
   spawn_teleport.spawn_teleport_hospital()
-  netpacket_pda_id = netpacket_pda_create.create_pda()
+  netpacket_pda_create.create_pda()
   akill.akill_start_sound()
 
   -------- пауза при загрузке ---------------
@@ -385,7 +384,6 @@ function actor_binder:on_item_take( obj )
     amk.on_item_take( obj )
     braad_test.checking_use_item( obj )
     babah.on_item_take( obj )
-    monster_parts.on_part_take( obj )
     fly.returner_clear_pos( obj )
     if
       obj:is_weapon_magazined() and self.object:is_talking()
@@ -703,16 +701,14 @@ function actor_binder:save( packet )
 
   -- удаление запущенных варок перед сейвом
   amk.remove_timer( "af_transform_universal" )
-  
+
   if level.get_game_difficulty() == 0 then
     db.actor:give_info_portion( "acv_real_fail" )
   end
-  
+
   if not has_alife_info("teleport_started") and utils.level_changing() then
     archievements.acv_count_event( "acv_skit", 300, "Скиталец" )
   end
-
-  if rx_ai then rx_ai.actor_save( packet ) end
 
   self:save_old( packet )
   ASSERT(
@@ -754,17 +750,17 @@ function actor_binder:load( reader )
 
   --' Загружаем уровень сложности
   local game_difficulty = reader:r_u8()
-  local load_treasure_manager = false      
-  if game_difficulty >= 128 then           
+  local load_treasure_manager = false
+  if game_difficulty >= 128 then
     game_difficulty = game_difficulty - 128
-    load_treasure_manager = true           
-  end                                      
+    load_treasure_manager = true
+  end
 
   local game_difficulty_by_num = {
-    [0] = "gd_novice",
-    [1] = "gd_stalker",
-    [2] = "gd_veteran",
-    [3] = "gd_master"
+    [ 0 ] = "gd_novice",
+    [ 1 ] = "gd_stalker",
+    [ 2 ] = "gd_veteran",
+    [ 3 ] = "gd_master"
   }
   get_console():execute(
     "g_game_difficulty " .. game_difficulty_by_num[ game_difficulty ]

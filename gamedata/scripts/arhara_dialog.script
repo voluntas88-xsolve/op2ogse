@@ -7,11 +7,7 @@ end
 
 function on_first_update()
   local items = {
-    [ "amul_naemn"     ] = this.checking_taken_item48,
-    [ "amulet"         ] = this.checking_taken_item44,
-    -- [ "bullion_gild"   ] = this.checking_taken_item50,
-    [ "kaktus_izomorf" ] = this.checking_taken_item56,
-    [ "streyndzher"    ] = this.checking_taken_item58,
+    [ "streyndzher" ] = this.checking_taken_item58,
   }
   for sect, fun in pairs( items ) do
     local obj = db.actor:object( sect )
@@ -156,7 +152,7 @@ return sak.have_item_namber("wpn_m_134_baty",1) ~= false
 --' отдадим миниган Адреналину, получим награду и Адреналин - друг
 function atp_propusk_done(first_speaker, second_speaker)
 sak.out_item_namber("wpn_m_134_baty",1)
-dialogs.relocate_item_section(second_speaker, "wpn_svd_m1","in")
+dialogs.relocate_item_section(second_speaker, "wpn_ak74_1pn93","in")
 dialogs.relocate_item_section(second_speaker, "af_spirit_2","in")
 second_speaker:set_relation(game_object.friend, first_speaker)
 end
@@ -226,33 +222,69 @@ local obj = alife():create("arhara_tele",vector():set(37.431,56.184,32.087),4591
 local obj = alife():create("wpn_aa12",vector():set(37.432,56.184,32.087),4591,2417)
 end
 
+
 --' спавним наш мозг на ЧАЭС2
-function mozg()
-local obj = alife():create("mozg",vector():set(206.574,-0.102,379.099),79782,2580)
-local obj = alife():create("tank_spawn_zasada4",vector():set(206.574,-0.102,378.099),79782,2580)
-local obj = alife():create("tank_spawn_zasada6",vector():set(206.574,-0.102,377.099),79782,2580)
-local obj = alife():create("mozg",vector():set(505.838,11.748,352.584),189400,2619)
-local obj = alife():create("tank_spawn_zasada1",vector():set(504.838,11.748,352.584),189400,2619)
-local obj = alife():create("tank_spawn_zasada7",vector():set(506.838,11.748,352.584),189400,2619)
-local obj = alife():create("mozg",vector():set(1018.527,-0.001,382.414),263677,2650)
-local obj = alife():create("mozg",vector():set(1018.527,-0.001,382.414),263677,2650)
-local obj = alife():create("mozg",vector():set(1018.527,-0.001,382.414),263677,2650)
-local obj = alife():create("tank_spawn_zasada6",vector():set(1018.827,-0.001,382.414),263677,2650)
-local obj = alife():create("tank_spawn_zasada2",vector():set(1018.427,-0.001,382.414),263677,2650)
-local obj = alife():create("mozg",vector():set(505.838,11.748,352.584),189400,2619)
-local obj = alife():create("mozg",vector():set(505.838,11.748,352.584),189400,2619)
-local obj = alife():create("mozg",vector():set(505.838,11.748,352.584),189400,2619)
-local obj = alife():create("tank_spawn_zasada5",vector():set(505.238,11.748,352.584),189400,2619)
-local obj = alife():create("tank_spawn_zasada7",vector():set(505.038,11.748,352.584),189400,2619)
-local obj = alife():create("mozg",vector():set(206.574,-0.102,379.099),79782,2580)
-local obj = alife():create("mozg",vector():set(206.574,-0.102,379.099),79782,2580)
-local obj = alife():create("tank_spawn_zasada1",vector():set(206.274,-0.102,379.099),79782,2580)
-local obj = alife():create("tank_spawn_zasada5",vector():set(206.874,-0.102,379.099),79782,2580)
-local obj = alife():create("mozg",vector():set(1018.527,-0.001,382.414),263677,2650)
-local obj = alife():create("tank_spawn_zasada3",vector():set(1018.727,-0.001,382.414),263677,2650)
-local obj = alife():create("mozg",vector():set(322.26416015625,-2.5768759250641,-295.98400878906),838294,2847)
-local obj = alife():create("tank_spawn_zasada7",vector():set(326.26416015625,-2.5768759250641,-295.98400878906),838294,2847)
+function mozg_atp_for_test22()
+  alife():create(
+    "mozg",
+    vector():set( 322.26416015625, -2.5768759250641, -295.98400878906 ),
+    838294, 2847
+  )
 end
+
+function mozg_l12_stancia_2()
+  alife():create(
+    "mozg", vector():set( 206.574,-0.102,379.099 ), 79782, 2580
+  )
+  alife():create(
+    "mozg", vector():set( 505.838,11.748,352.584 ), 189400, 2619
+  )
+  alife():create(
+    "mozg", vector():set( 1018.527,-0.001,382.414 ), 263677, 2650
+  )
+  alife():create(
+    "mozg", vector():set( 1018.527,-0.001,382.414 ), 263677, 2650
+  )
+  alife():create(
+    "mozg", vector():set( 1018.527,-0.001,382.414 ), 263677, 2650
+  )
+  alife():create(
+    "mozg", vector():set( 505.838,11.748,352.584 ), 189400, 2619
+  )
+  alife():create(
+    "mozg", vector():set( 505.838,11.748,352.584 ), 189400, 2619
+  )
+  alife():create(
+    "mozg", vector():set( 505.838,11.748,352.584 ), 189400, 2619
+  )
+  alife():create(
+    "mozg", vector():set( 206.574,-0.102,379.099 ), 79782, 2580
+  )
+  alife():create(
+    "mozg", vector():set( 206.574,-0.102,379.099 ), 79782, 2580
+  )
+  alife():create(
+    "mozg", vector():set( 1018.527,-0.001,382.414 ), 263677, 2650
+  )
+end
+
+function mozg()
+  mozg_l12_stancia_2()
+  mozg_atp_for_test22()
+  alife():create("tank_spawn_zasada4",vector():set(206.574,-0.102,378.099),79782,2580)
+  alife():create("tank_spawn_zasada6",vector():set(206.574,-0.102,377.099),79782,2580)
+  alife():create("tank_spawn_zasada1",vector():set(504.838,11.748,352.584),189400,2619)
+  alife():create("tank_spawn_zasada7",vector():set(506.838,11.748,352.584),189400,2619)
+  alife():create("tank_spawn_zasada6",vector():set(1018.827,-0.001,382.414),263677,2650)
+  alife():create("tank_spawn_zasada2",vector():set(1018.427,-0.001,382.414),263677,2650)
+  alife():create("tank_spawn_zasada5",vector():set(505.238,11.748,352.584),189400,2619)
+  alife():create("tank_spawn_zasada7",vector():set(505.038,11.748,352.584),189400,2619)
+  alife():create("tank_spawn_zasada1",vector():set(206.274,-0.102,379.099),79782,2580)
+  alife():create("tank_spawn_zasada5",vector():set(206.874,-0.102,379.099),79782,2580)
+  alife():create("tank_spawn_zasada3",vector():set(1018.727,-0.001,382.414),263677,2650)
+  alife():create("tank_spawn_zasada7",vector():set(326.26416015625,-2.5768759250641,-295.98400878906),838294,2847)
+end
+
 
 --' Раз Ломти не спавнятся, заставим, да ещё и контролёров добавим
 function spawn_arts()
@@ -537,27 +569,11 @@ end
 --' эта функция проверяет наличие нужных предметов для шахтёра - отключена ибо теперь не нужна
 function arhara_shaxter_have()
 return true 
---[[return new_dialog.item_much("wpn_vepr12_col",1) ~= false and
-new_dialog.item_much("af_part_monolit",1) ~= false and
-new_dialog.item_much("af_vyvert_green",1) ~= false and
-new_dialog.item_much("af_dik_1",5) ~= false and
-new_dialog.item_much("exo_military_outfit",1) ~= false]]
   end
 
 --' отдадим монолит Шахтёру, а заодно и весь скарб
 -- теперь это не нужно - теперь при выпивании микстуры отбирается все, что гг собрал в пещере - с чем пришел, с тем и вышел
 function arhara_shaxter_done(first_speaker, second_speaker)
---[[sak.out_item_namber("wpn_vepr12_col",1)
-sak.out_item_namber("wpn_tt33_m1",1)
-sak.out_item_namber("exo_military_outfit",1)
-sak.out_item_namber("af_dik_1",5)
-sak.out_item_namber("af_part_monolit",1)
-sak.out_item_namber("af_vyvert_green",1)
-sak.out_item_namber("mutant_poltergeist_glas",1)
-sak.out_item_namber("mutant_psevdogigant_hand",5)
-sak.out_item_namber("mutant_dog_tail",2)
-sak.out_item_namber("mutant_krovosos_jaw",2)
-sak.out_item_namber("mutant_burer_hand",1)]]
 dialogs.relocate_item_section(second_speaker, "shaxter_tele","in")
 end
 
@@ -1047,8 +1063,8 @@ sak.out_item_namber("mutant_zombie_hand",40)
 dialogs.relocate_money(second_speaker, 10000, "in")
 dialogs.relocate_item_section(first_speaker, "wpn_ak74u_svd", "in")
 dialogs.relocate_item_section(first_speaker, "wpn_addon_scope_m2", "in")
-dialogs.relocate_item_section(first_speaker, "ammo_7.62x54_7h14", "in")
-dialogs.relocate_item_section(first_speaker, "ammo_7.62x54_7h14", "in")
+dialogs.relocate_item_section(first_speaker, "ammo_7.62x54_7h1", "in")
+dialogs.relocate_item_section(first_speaker, "ammo_7.62x54_7h1", "in")
 second_speaker:set_relation(game_object.friend, first_speaker)
 db.actor:change_character_reputation(30)
 end
@@ -1464,16 +1480,15 @@ function sidor_amulet_vzyt_done()
 sak.out_item_namber("amulet",1)
 sak.out_item_namber("remontnyi_box",2)
 kostya_dialog.stealth_fail_task()
-relation_registry.set_community_goodwill("freedom", db.actor:id(), relation_registry.community_goodwill("freedom", db.actor:id())+1000)
 end
 
+
 --' сделаем ГГ нейтралом
-function join_stalker(actor, npc)
-    printf ("ACTOR NOW IN STALKER COMMUNITY")
-    if db.actor then
-       db.actor:set_character_community("stalker", 0, 0)
-    end
+function join_stalker()
+  db.actor:set_character_community( "stalker", 0, 0 )
+  dsh_amulet_monolith.unsubscribe()
 end
+
 
 --' проверим арты для Тени Монолита
 function ten_monolita_talk_have()
@@ -1503,7 +1518,7 @@ local obj = alife():create("ammo_5.56x45_ap",vector():set(-320.936,64.972,201.86
 local obj = alife():create("medkit_scientic",vector():set(-320.814,64.967,204.396),34601,2987)
 local obj = alife():create("medkit",vector():set(-320.916,64.968,202.351),34592,2987)
 local obj = alife():create("medkit",vector():set(-320.916,64.968,202.351),34592,2987)
-local obj = alife():create("ammo_9x39_pab9",vector():set(-320.949,64.977,201.543),34588,2987)
+local obj = alife():create("ammo_9x39_ap",vector():set(-320.949,64.977,201.543),34588,2987)
 local obj = alife():create("ammo_5.45x39_ap",vector():set(-320.960,64.996,201.007),34583,2987)
 local obj = alife():create("ammo_og-7b",vector():set(-320.963,65.005,200.770),34583,2987)
 end
@@ -6677,33 +6692,10 @@ function fotka_mozga_have( first_speaker, second_speaker )
 end
 
 
---' ГГ друг зомбарей
-function drug_psss()
-  db.actor:set_character_community( "stranger", 0, 0 )
-  local chkgoodwill = relation_registry.community_goodwill(
-    "zombied", db.actor:id()
-  )
-  if chkgoodwill < 0 then 
-    chkgoodwill = chkgoodwill + 6000
-    relation_registry.set_community_goodwill (
-      "zombied", db.actor:id(), chkgoodwill
-    )
-  else
-    relation_registry.set_community_goodwill( "zombied", db.actor:id(), 6000 )
-    db.actor:give_info_portion( "xvatit_uzhe" )
-  end
-end
-
-
-function checking_taken_item56( obj )
-  if not has_alife_info( "xvatit_uzhe" ) then
-    if obj:section() == "kaktus_izomorf" then drug_psss() end
-  end
-end
-
-
 --' ГГ враг зомбарей
-function vrag_zombie()
+function vrag_zombie() end
+
+function vrag_zombie_old()
   db.actor:set_character_community( "stalker", 0, 0 )
   local chkgoodwill = relation_registry.community_goodwill(
     "zombied", db.actor:id()
@@ -6959,10 +6951,18 @@ function otdal_chumodaniscte(first_speaker, second_speaker)
 sak.out_item_namber("chemodan_piyan",1)
  end
 
---' Кузя дал артмодификатор
-function devays_kuzy_dal(first_speaker, second_speaker)
-dialogs.relocate_item_section(second_speaker, "amk_transmutator","in")
+
+--' Кузя дал награду
+function devays_kuzy_dal_545()
+  sak.create_items_actor( "ammo_5.45x39_ap", 10 )
+  sak.create_items_actor( "medkit_army",     10 )
 end
+
+function devays_kuzy_dal_762()
+  sak.create_items_actor( "ammo_7.62x39_ap", 10 )
+  sak.create_items_actor( "medkit_army",     10 )
+end
+
 
 --' проверим наличие 25 пузырей водки
 function pollitra_dvadtsatpyat()

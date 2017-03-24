@@ -3,7 +3,7 @@
 local prob           = 0.35
 local prob_offline_trade = 0.1
 local prob_spawn_monster = 0.2
-local prob_spawn_stalker = 0.4
+local prob_spawn_stalker = 0.2
 local dist_close     = 100
 local dist_seen      = 200
 local dist_far       = 200
@@ -2177,6 +2177,7 @@ function create_treasurebox()
     "m_inventory_box",
     db.actor:position(), db.actor:level_vertex_id(), db.actor:game_vertex_id()
   )
+  sobj = alife():object( sobj.id )
   local pk = get_netpk( sobj, 1 )
   ASSERT(
     pk:isOk(), "[%s]: can't parse netpk: %s",
@@ -2186,10 +2187,8 @@ function create_treasurebox()
   data.custom_data:setString(
     "[logic]\ncfg = scripts\\treasure_inventory_box.ltx"
   )
-  data.object_flags = bit_and(
-    data.object_flags, bit_not( object_flags.UsedAI_Locations )
-  ) -- снять флаг flUsedAI_Locations
   pk:set( data )
+  sobj:use_ai_locations( false )
 end
 
 

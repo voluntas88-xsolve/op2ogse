@@ -1,15 +1,31 @@
 -- -*- mode: lua; coding: windows-1251-dos -*-
 
 function attach( sm )
-  sm:subscribe({ signal = "on_first_update", fun = this.on_first_update })
+  sm:subscribe({ signal = "on_spawn", fun = this.on_spawn })
 end
 
 
-function on_first_update()
+local peshera_table = {}
+local function init_peshera_table()
+  local t = ogse.load_var_safe( script_name() .. ".peshera_clear" )
+  if t then
+    for _, k in ipairs( t ) do
+      peshera_table[ k ] = true
+    end
+  end
+end
+
+
+function on_spawn()
   if has_alife_info( "peshera_go" ) then
-    ogse_signals.get_mgr():subscribe({
-      signal = "on_take", fun = this.peshera_go
-    })
+    init_peshera_table()
+    local sm = ogse_signals.get_mgr()
+    dsh.exec_on_update(
+      function()
+        sm:subscribe({ signal = "on_take", fun = this.peshera_go })
+      end
+    )
+    sm:subscribe({ signal = "on_save", fun = this.peshera_save })
   end
 end
 
@@ -90,98 +106,116 @@ local b = {
     alife():create("skelet_ded", vector():set(a.position.x,a.position.y,a.position.z), a.lv, a.gv)
 end
 
-local peshera_table
-local function init_peshera_table()
-	if peshera_table == nil then
-		peshera_table = xr_logic.pstor_get_custom(db.actor, "peshera_clear", "peshera_clear")
-	end
+
+function peshera_save()
+  local t = {}
+  for k, _ in pairs( peshera_table ) do
+    table.insert( t, k )
+  end
+  ogse.save_var(
+    script_name() .. ".peshera_clear", t, "array_template", { "u16" }
+  )
 end
 
-function peshera_drink(obj)
-	if obj:section() == "snotvornoe_tele" then
-		peshera_start()
-	elseif obj:section() == "shaxter_tele" then
-		peshera_end()
-	end
+
+function peshera_drink( obj )
+  if obj:section() == "snotvornoe_tele" then
+    peshera_start()
+  elseif obj:section() == "shaxter_tele" then
+    peshera_end()
+  end
 end
 
-function peshera_go(obj)
-	if has_alife_info("peshera_go") and obj:section() ~= "separator" then
-		init_peshera_table()
-		peshera_table[obj:id()] = true
-	end
+
+function peshera_go( obj )
+  if has_alife_info( "peshera_go" ) then
+    peshera_table[ obj:id() ] = true
+  end
 end
+
 
 function peshera_start()
-	local box = obj_by_name("level_prefix_inventory_box_0003")
-	if box then
-		db.actor:give_info_portion("biznes_remove_special_item")
-		db.actor:iterate_inventory(
-			function(dummy,item)
-				if not protected_items.actor_items_keep(item:section()) then
-					db.actor:transfer_item(level.object_by_id(item:id()), box)
-				end
-			end
-		,db.actor)
-		alife():create("zamok", vector():set(0,0,0), 0, 0, box:id())
-		db.actor:disable_info_portion("biznes_remove_special_item")
-	end
-	
-	create_teleport("peshera_blok_tp",vector():set(-112.609199523926,-9.9281539916992,-34.9218902587891),12288,2868)
-
-	db.actor:give_info_portion("peshera_go")
-	init_peshera_table()
-	if level.get_game_difficulty() < 2 then
-		snp.invul_on()
-	end
+  local box = obj_by_name( "level_prefix_inventory_box_0003" )
+  if box then
+    db.actor:give_info_portion( "biznes_remove_special_item" )
+    db.actor:iterate_inventory(
+      function( dummy, item )
+        if not protected_items.actor_items_keep( item:section() ) then
+          db.actor:transfer_item( level.object_by_id( item:id() ), box )
+        end
+      end
+      , db.actor
+    )
+    alife():create( "zamok", vector():set( 0, 0, 0), 0, 0, box:id() )
+    db.actor:disable_info_portion("biznes_remove_special_item")
+  end
+  create_teleport(
+    "peshera_blok_tp",
+    vector():set( -112.609199523926, -9.9281539916992, -34.9218902587891 ),
+    12288, 2868
+  )
+  db.actor:give_info_portion( "peshera_go" )
+  if level.get_game_difficulty() < 2 then
+    snp.invul_on()
+  end
 end
+
 
 function peshera_end()
-	snp.invul_off()
-	db.actor:give_info_portion("biznes_remove_special_item")
-	db.actor:iterate_inventory(
-		function(dummy,item)
-			if not protected_items.actor_items_keep(item:section()) then
-				alife():release(alife():object(item:id()))
-			end
-		end
-	,db.actor)
-	
-	local obj
-	init_peshera_table()
-	for k,v in pairs(peshera_table) do
-		obj = alife():object(k)
-		if obj and obj.parent_id ~= db.actor:id() and not protected_items.actor_items_keep(obj:section_name()) then
-			alife():release(obj)
-		end
-	end
-	db.actor:disable_info_portion("biznes_remove_special_item")
-	xr_logic.pstor_clear_custom(db.actor, "peshera_clear")
+  snp.invul_off()
+  db.actor:give_info_portion( "biznes_remove_special_item" )
+  db.actor:iterate_inventory(
+    function( dummy, item )
+      if not protected_items.actor_items_keep( item:section() ) then
+        alife():release( alife():object( item:id() ) )
+      end
+    end
+    , db.actor
+  )
+  for k, v in pairs( peshera_table ) do
+    local obj = alife():object( k )
+    if
+      obj and obj.parent_id ~= db.actor:id()
+      and not protected_items.actor_items_keep( obj:section_name() )
+    then
+      alife():release( obj )
+    end
+  end
+  db.actor:disable_info_portion( "biznes_remove_special_item" )
+  ogse.delete_var( script_name() .. ".peshera_clear" )
+  local sm = ogse_signals.get_mgr()
+  for id, is_npc in pairs( db.creature ) do
+    if not is_npc then
+      local sobj = alife():object( id )
+      if sobj then
+        alife():release( sobj )
+        sm:call( "on_release_npc", id )
+      end
+    end
+  end
 
-	for id,obj in pairs(db.creatures) do
-		if obj and IAmAMonster[obj:clsid()] then
-			alife():release(alife():object(id))
-		end
-	end
+  for i = 1, 65534 do
+    local obj = alife():object( i )
+    if obj then
+      if
+        obj:section_name() == "af_part_monolit"
+        or obj:section_name() == "m_inventory_box16"
+      then
+        alife():release( obj )
+      elseif
+        obj:section_name() == "dsh_treasure_item"
+        and object_level_name( obj ) == "peshera"
+      then
+        dsh_rukzak.save_rukzak( obj.id, {} )
+        alife():release( obj )
+      end
+    end
+  end
 
-	for i=1,65535 do
-		obj = alife():object(i)
-		if obj then
-			if obj:section_name() == "af_part_monolit" or obj:section_name() == "m_inventory_box16" then
-				alife():release(obj)
-			elseif
-                          obj:section_name() == "dsh_treasure_item"
-                          and object_level_name( obj ) == "peshera"
-                        then
-                          dsh_rukzak.save_rukzak( obj.id, {} )
-                          alife():release( obj )
-			end
-		end
-	end
-
-	delete_teleport("peshera_blok_tp")
-	db.actor:disable_info_portion("peshera_go")
+  delete_teleport( "peshera_blok_tp" )
+  db.actor:disable_info_portion( "peshera_go" )
 end
+
 
 -- Поиск онлайнового объекта по его name в all.spawn
 function obj_by_name(name)
@@ -342,19 +376,27 @@ function remove_tm_taynik()
 	alife():release(snp.object_by_section_offline("z_inventory_box14"))
 end
 
+
 -- универсальная процедура спавна телепортов
-function create_teleport(section, pos, lv, gv)
-    local se_obj = alife():create(section, pos, lv, gv)
-	xr_logic.pstor_store(db.actor, section, se_obj.id)
-	return se_obj
+function create_teleport( section, pos, lv, gv )
+  local se_obj = alife():create( section, pos, lv, gv )
+  xr_logic.pstor_store( db.actor, section, se_obj.id )
+  return se_obj
 end
+
+
 -- универсальная процедура удаления телепортов
-function delete_teleport(section)
-	local se_obj = alife():object(xr_logic.pstor_retrieve(db.actor, section, -1, true))
-	if se_obj then
-		alife():release(se_obj, true)
-	end
+function delete_teleport( section )
+  local se_obj = alife():object(
+    xr_logic.pstor_retrieve( db.actor, section, -1, true )
+  )
+  if se_obj then
+    alife():release( se_obj, true )
+  else
+    dsh.alife_find_and_release({ section })
+  end
 end
+
 
 function feed_actor()   -- кормим перед сном
 	se_obj = alife():create("kolbasa_sleep",db.actor:position(),db.actor:level_vertex_id(),db.actor:game_vertex_id(),db.actor:id())
@@ -606,10 +648,14 @@ function kostya_biznes1_have()
 		return false
 	end
 end
+
+
 function kostya_biznes1_done()
-		sak.out_item_namber("af_buliz",5)
-	db.actor:give_info_portion("info_amk_recipt_power_2")
+  sak.out_item_namber( "af_buliz", 5 )
+  db.actor:give_info_portion( "info_amk_recipt_power_2" )
+  amk_dialogs.info_received()
 end
+
 
 function sidor_biznes_over()
 	return not (
@@ -921,7 +967,6 @@ function sidor_biznes6_have_all()
     })
     and new_dialog.item_much( "ammo_arbolt", 30 )
     and new_dialog.item_much( "ammo_7.62x54_7h1", 16 )
-    and new_dialog.item_much( "ammo_7.62x54_7h14", 16 )
     and new_dialog.item_much( "ammo_7.62x54_ap", 16 )
     and new_dialog.item_much( "ammo_9x39_sp5", 5 )
     and new_dialog.item_much( "ammo_9x39_ap", 5 )
@@ -948,7 +993,6 @@ function sidor_biznes6_done()
  })
   sak.out_item_namber( "ammo_arbolt", 30 )
   sak.out_item_namber( "ammo_7.62x54_7h1", 16 )
-  sak.out_item_namber( "ammo_7.62x54_7h14", 16 )
   sak.out_item_namber( "ammo_7.62x54_ap", 16 )
   sak.out_item_namber( "ammo_9x39_sp5", 5 )
   sak.out_item_namber( "ammo_9x39_ap", 5 )
@@ -1514,7 +1558,7 @@ function sak_biznes1_done()
 end
 
 function skraga_biznes1_have_all()
-	return db.actor:money()>=2000000	
+	return db.actor:money()>=1000000	
 end		
 function skraga_biznes1_have()
 	if skraga_biznes1_have_all() then
@@ -1998,13 +2042,13 @@ function spawn_s_teleport1_2()
     local se_obj = alife():create("s_teleport1_2",vector():set(207.23626708984,17.963800430298,48.94217300415),260660,2145)
 	xr_logic.pstor_store(db.actor, "s_teleport1_2", se_obj.id)		  
 end
-function delete_s_teleport1_2(story_id)
-	local obj_id = xr_logic.pstor_retrieve(db.actor, "s_teleport1_2", -1, true)
-	local se_obj = alife() : object(obj_id)
-if se_obj then
-  alife():release(se_obj, true)
+
+
+function delete_s_teleport1_2( story_id )
+  delete_teleport( "s_teleport1_2" )
 end
-end
+
+
 function spawn_s_teleport1_3_1()
     local se_obj = alife():create("s_teleport1_3_1",vector():set(98.162727355957,28.547431945801,38.083969116211),225595,2143)
 	xr_logic.pstor_store(db.actor, "s_teleport1_3_1", se_obj.id)		  
@@ -2026,37 +2070,34 @@ function spawn_s_teleport3_2()
     local se_obj = alife():create("s_teleport3_2",vector():set(-150.38586425781,-5.7839937210083,-278.90524291992),6896,3238)
 	xr_logic.pstor_store(db.actor, "s_teleport3_2", se_obj.id)		  
 end
-function delete_s_teleport3_2(story_id)
-	local obj_id = xr_logic.pstor_retrieve(db.actor, "s_teleport3_2", -1, true)
-	local se_obj = alife() : object(obj_id)
-if se_obj then
-  alife():release(se_obj, true)
+
+
+function delete_s_teleport3_2( story_id )
+  delete_teleport( "s_teleport3_2" )
 end
-end
+
 
 function spawn_s_teleport4_1()
     local se_obj = alife():create("s_teleport4_1",vector():set(308.16702270508,-37.625602722168,-21.087753295898),69058,1930)
 	xr_logic.pstor_store(db.actor, "s_teleport4_1", se_obj.id)		  
 end
-function delete_s_teleport4_1(story_id)
-	local obj_id = xr_logic.pstor_retrieve(db.actor, "s_teleport4_1", -1, true)
-	local se_obj = alife() : object(obj_id)
-if se_obj then
-  alife():release(se_obj, true)
+
+
+function delete_s_teleport4_1( story_id )
+  delete_teleport( "s_teleport4_1" )
 end
-end
+
 
 function spawn_s_teleport0_1()
     local se_obj = alife():create("s_teleport0_1",vector():set(-1.5840334892273,5.1518805027008,-44.498065948486),10089,1961)
 	xr_logic.pstor_store(db.actor, "s_teleport0_1", se_obj.id)		  
 end
-function delete_s_teleport0_1(story_id)
-	local obj_id = xr_logic.pstor_retrieve(db.actor, "s_teleport0_1", -1, true)
-	local se_obj = alife() : object(obj_id)
-if se_obj then
-  alife():release(se_obj, true)
+
+
+function delete_s_teleport0_1( story_id )
+  delete_teleport( "s_teleport0_1" )
 end
-end
+
 
 function checking_taken_item59(obj)
   local obj_sect = obj:section()
@@ -2505,13 +2546,13 @@ function spawn_t_teleport1_1()
     local se_obj = alife():create("t_teleport1_1",vector():set(190.83657836914,2.7860803604126,217.42588806152),260274,2219)
 	xr_logic.pstor_store(db.actor, "t_teleport1_1", se_obj.id)		  
 end
-function delete_t_teleport1_1(story_id)
-	local obj_id = xr_logic.pstor_retrieve(db.actor, "t_teleport1_1", -1, true)
-	local se_obj = alife() : object(obj_id)
-if se_obj then
-  alife():release(se_obj, true)
+
+
+function delete_t_teleport1_1( story_id )
+  delete_teleport( "t_teleport1_1" )
 end
-end
+
+
 function spawn_t_teleport1_2()
     local se_obj = alife():create("t_teleport1_2",vector():set(23.953285217285,10.699913024902,162.15838623047),131398,2199)
 	xr_logic.pstor_store(db.actor, "t_teleport1_2", se_obj.id)		  
