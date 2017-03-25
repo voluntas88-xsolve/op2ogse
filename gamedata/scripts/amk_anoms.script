@@ -1038,10 +1038,19 @@ function after_blow_on()
       end
     end
   )
-  for _, sobj in ipairs( get_all_mobs( lname ) ) do
-    forbidden_lvids[ sobj.m_level_vertex_id ] = true
-    table.insert( forbidden_pos, sobj.position )
+  for id = 1, 65534 do
+    local sobj = alife():object( id )
+    if sobj then
+      if object_level_name( sobj ) == lname then
+        forbidden_lvids[ sobj.m_level_vertex_id ] = true
+        table.insert( forbidden_pos, sobj.position )
+      end
+    end
   end
+  -- for _, sobj in ipairs( get_all_mobs( lname ) ) do
+  --   forbidden_lvids[ sobj.m_level_vertex_id ] = true
+  --   table.insert( forbidden_pos, sobj.position )
+  -- end
   if level_vertexes[ lname ] and level_anoms[ lname ] then
     generate_anoms()
     move_mgr.invalidate_pp_accessibility()
@@ -1101,14 +1110,19 @@ function pre_blow_off()
   )
   for id = 1, 65534 do
     local sobj = alife():object( id )
-    if sobj and is_generated_anomaly( sobj ) then
-      alife():release( sobj, true )
+    if sobj then
+      if is_generated_anomaly( sobj ) then
+        alife():release( sobj, true )
+      elseif object_level_name( sobj ) == level.name() then
+        forbidden_lvids[ sobj.m_level_vertex_id ] = true
+        table.insert( forbidden_pos, sobj.position )
+      end
     end
   end
-  for _, sobj in ipairs( get_all_mobs( level.name() ) ) do
-    forbidden_lvids[ sobj.m_level_vertex_id ] = true
-    table.insert( forbidden_pos, sobj.position )
-  end
+  -- for _, sobj in ipairs( get_all_mobs( level.name() ) ) do
+  --   forbidden_lvids[ sobj.m_level_vertex_id ] = true
+  --   table.insert( forbidden_pos, sobj.position )
+  -- end
 end
 
 
@@ -1328,7 +1342,6 @@ function randomize_arts()
           known_arts[ lname ] and known_arts[ lname ][ sect ]
           and not dsh.is_handmade_artefact( sobj )
         then
-          local orig_dist = sobj.position:distance_to( db.actor:position() )
           local cur_lv  = sobj.m_level_vertex_id
           local cur_pos = sobj.position
           if is_relocating then
@@ -1336,10 +1349,7 @@ function randomize_arts()
               local pos, new_gv, new_lv = calc_new_free_pos(
                 lname,
                 function( np )
-                  return (
-                    np:distance_to( db.actor:position() ) >= orig_dist
-                    and np:distance_to( sobj.position   ) >= 10
-                  )
+                  return np:distance_to( sobj.position ) > 50
                 end
               )
               if pos then
@@ -1476,7 +1486,7 @@ function get_random_art_sect( lname )
     function( a, b ) return a.weight > b.weight end
   )
   local rnd = dsh.get_next_random(
-    script_name() .. ".get_random_art_sect", 0, rnd_max
+    "amk_anoms.get_random_art_sect", 0, rnd_max
   )
   for _, v in ipairs( arts ) do
     rnd = rnd - v.weight
@@ -1484,7 +1494,7 @@ function get_random_art_sect( lname )
       local items = arts_sections[ v.sect ]
       if table.getn( items ) > 1 then
         local rnd = dsh.get_next_random(
-          script_name() .. ".get_random_art_sect", table.getn( items )
+          "amk_anoms.get_random_art_sect", table.getn( items )
         )
         return items[ rnd ]
       else
@@ -1553,9 +1563,7 @@ function check_exclusion( obj, map )
   if not level_anoms[ map ]      then return true  end
   local obj_name = obj:name()
   return
-    get_bool(
-      obj:section_name(), script_name() .. ".check_exclusion", false
-    )
+    get_bool( obj:section_name(), "amk_anoms.check_exclusion", false )
     or string.find( obj_name, "zone_tuman" )       -- Îñòğîâà òóìàí 
     or string.find( obj_name, "zat_", 1, true )
     or string.find( obj_name, "zone_ozero" )
@@ -1761,9 +1769,7 @@ function make_dyn_art_sect( sect, min, bio )
     min = 1
   end
   local suff
-  local arts_dyn = dsh.get_next_random(
-    script_name() .. ".make_dyn_art_sect", min, 21
-  )
+  local arts_dyn = dsh.get_next_random( "amk_anoms.make_dyn_art_sect", min, 21 )
   if arts_dyn     >=  1 and arts_dyn <=  3 then
     suff = "_dyn1d"
   elseif arts_dyn >=  4 and arts_dyn <=  9 then

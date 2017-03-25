@@ -6145,7 +6145,7 @@
 </phrase>
 <phrase id="6">
 <text>poisk_partizan_start_6</text>
-	<action>spawn_restrictor.poisk_partizan_sr1</action>
+	<action>xr_effects.poisk_partizan_spawn</action>
 	<action>akill.partizan_mutant</action>
 	<give_info>poisk_partizan_start</give_info>
 </phrase>
@@ -8016,11 +8016,11 @@
 <phrase_list>
 <phrase id="0">
 <text>find_chip_start_0</text>
-<!--
 <next>1</next>
 </phrase>
 <phrase id="1">
 <text>find_chip_start_1</text>
+<!--
 <next>2</next>
 <next>3</next>
 </phrase>
@@ -9261,7 +9261,7 @@
 	<has_info>volna_sak_done</has_info>
 	<has_info>volna_kogot_done</has_info>
 	<has_info>find_mina_have</has_info>
-	<has_info>buusty_gigant_done</has_info>
+<!--	<has_info>buusty_gigant_done</has_info> -->
 <phrase_list>
 <phrase id="0">
 <text>volna_union_done_0</text>
