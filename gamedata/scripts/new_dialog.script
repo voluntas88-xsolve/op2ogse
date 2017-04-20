@@ -477,6 +477,11 @@ function yakut_help_done( first_speaker, second_speaker )
 end
 
 
+function yakut_treasure_spawn()
+  alife():create( alife():spawn_id( story_ids.yakut_treasure_box ) )
+end
+
+
 function yakut_treasure_have()
   return item_much( "notebook_new", 1 )
 end
@@ -497,6 +502,11 @@ function dan_flash_done( first_speaker, second_speaker )
   out_item_much( "nauch_flash", 1 )
   dialogs.relocate_item_section( first_speaker, "good_psy_helmet", "in" )
 end	
+
+
+function treasure_ecolog_spawn()
+  alife():create( alife():spawn_id( story_ids.prizrak_treasure_box ) )
+end
 
 
 function treasure_ecolog_have()

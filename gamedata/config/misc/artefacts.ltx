@@ -7242,7 +7242,6 @@ power_restore_speed		= 0.0
 bleeding_restore_speed	= -0.0029851
 
 hit_absorbation_sect		= af_provoloka_absorbation
-art_hit.art_hit = 0.6, 0.3, chemical_burn
 
 bind_stalker.on_take_call = akill.checking_taken_item83
 
@@ -7368,6 +7367,22 @@ telepatic_immunity = 2.0
 chemical_burn_immunity = 1.0
 explosion_immunity = 1.0
 fire_wound_immunity = 2.0
+
+
+[life_saver_af_unknown]:af_base
+GroupControlSection			= spawn_group
+$spawn						= "artifacts\af_life_saver_unknown"
+;visual						= dinamics\artefacts\af_black_tip.ogf
+description					= life_saver_af_unknown_desc
+inv_name					= life_saver_af_unknown
+inv_grid_x					= 80
+inv_grid_y					= 77
+quest_item = true
+
+[life_saver_af_known]:life_saver_af_unknown
+description = life_saver_af_known_desc
+inv_name    = life_saver_af_known
+
 
 ;chessplayer end
 #include "amk_mod_arts.ltx"

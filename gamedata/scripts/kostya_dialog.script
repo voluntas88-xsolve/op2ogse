@@ -140,11 +140,16 @@ function peshera_start()
     db.actor:give_info_portion( "biznes_remove_special_item" )
     db.actor:iterate_inventory(
       function( dummy, item )
-        if not protected_items.actor_items_keep( item:section() ) then
+        if
+          not (
+            get_bool( item:section(), "quest_item", false )
+            or protected_items.actor_items_keep( item:section() )
+          )
+        then
           db.actor:transfer_item( level.object_by_id( item:id() ), box )
         end
-      end
-      , db.actor
+      end,
+      db.actor
     )
     alife():create( "zamok", vector():set( 0, 0, 0), 0, 0, box:id() )
     db.actor:disable_info_portion("biznes_remove_special_item")
@@ -166,11 +171,16 @@ function peshera_end()
   db.actor:give_info_portion( "biznes_remove_special_item" )
   db.actor:iterate_inventory(
     function( dummy, item )
-      if not protected_items.actor_items_keep( item:section() ) then
+      if
+        not (
+          get_bool( item:section(), "quest_item", false )
+          or protected_items.actor_items_keep( item:section() )
+        )
+      then
         alife():release( alife():object( item:id() ) )
       end
-    end
-    , db.actor
+    end,
+    db.actor
   )
   for k, v in pairs( peshera_table ) do
     local obj = alife():object( k )
@@ -297,14 +307,15 @@ function give_ammo( qty )
   local ammo = {
     "ammo_gauss",
     "ammo_minigun",
-    "ammo_12x70_kart",
+    "ammo_12x76_dart",
     "ammo_357_ap_mag",
     "ammo_12.7x108",
     "ammo_zhekan_izomorf",
     "ammo_9x39_izomorf",
-    "ammo_5.45x39_izomorf"
+    "ammo_5.45x39_izomorf",
+    "ammo_7.62x54_izomorf",
   }
-  for i =1, qty do
+  for i = 1, qty do
     local rnd = dsh.get_next_random(
       "kostya_dialog.give_ammo.rnd", table.getn( ammo )
     )

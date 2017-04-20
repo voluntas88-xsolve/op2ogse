@@ -89,7 +89,7 @@ function begin_sleep( desired_sleep_time )
   set_ignore_game_state_update()
   sleeping_now = false
   break_sleep_request = false
-  -- ogse_weather_mgr.get_weather_mgr():update() -- обновили менеджер погоды
+  ogse_weather_mgr.get_weather_mgr():update() -- обновили менеджер погоды
 
   -- сколько реально спали
   local awakening_time  = game.get_game_time()
@@ -130,7 +130,8 @@ function begin_sleep( desired_sleep_time )
 
   -- привет мир
   sm:call( "on_sleep_finished", real_sleep_time )
-  u3_utils.savegame(
+  dsh.exec_on_update(
+    u3_utils.savegame,
     "День " .. amk.game_days()
     .. ". Пробуждение. " .. game.translate_string( level.name() )
   )

@@ -943,8 +943,24 @@
 </phrase>
 <phrase id="5">
 <text>arhara_shaxter_5</text>
-<next>6</next>
+<next>51</next>
 </phrase>
+    <phrase id="51">
+      <text>arhara_shaxter_51</text>
+      <next>52</next>
+    </phrase>
+    <phrase id="52">
+      <text>arhara_shaxter_52</text>
+      <next>53</next>
+    </phrase>
+    <phrase id="53">
+      <text>arhara_shaxter_53</text>
+      <next>54</next>
+    </phrase>
+    <phrase id="54">
+      <text>arhara_shaxter_54</text>
+      <next>6</next>
+    </phrase>
 <phrase id="6">
   <text>arhara_shaxter_6</text>
   <give_info>arhara_shaxter_start</give_info>
@@ -962,10 +978,11 @@
   <action>spawn_restrictor.create_sr1</action>
   <action>spawn_restrictor.create_sr2</action>
   <action>spawn_teleport.spawn_item1</action>
+  <action>dsh_life_saver.learned_life_saver</action>
   <give_info>info_restriction</give_info>
 </phrase>
 </phrase_list>
-</dialog> 
+</dialog>
 
 
 <dialog id="shaxter_fonar_dost">
@@ -4953,11 +4970,11 @@
 </phrase> 
 <phrase id="2">
 <text>vitamin_warl_talk_2</text>
-<give_info>vitamin_reyd_zadan_done</give_info>
 <next>3</next>
 </phrase> 
 <phrase id="3">
 <text>vitamin_warl_talk_3</text>
+<give_info>vitamin_reyd_zadan_done</give_info>
 <action>arhara_dialog.delete_svoboda_radars</action>
 <action>arhara_dialog.vitamin_reyd_zadan_done</action>
 </phrase> 
@@ -6799,6 +6816,7 @@
 <dont_has_info>udav_vstrecha_start</dont_has_info>
 <phrase_list>
 <phrase id="0">
+<give_info>black_dok_gener_say_done</give_info>
 <text>udav_vstrecha_0</text>
 <next>1</next>
 </phrase>
@@ -11302,13 +11320,13 @@
 </phrase>
 <phrase id="9">
 <text>parfumer_say_one_9</text>
+<give_info>parfumer_say_one_start</give_info>
+<action>arhara_dialog.metka_city_starshoy</action>
+<action>arhara_dialog.remove_parfumer_metka</action>
 <next>10</next>
 </phrase>
 <phrase id="10">
 <text>parfumer_say_one_10</text>
-<give_info>parfumer_say_one_start</give_info>
-<action>arhara_dialog.metka_city_starshoy</action>
-<action>arhara_dialog.remove_parfumer_metka</action>
 </phrase>
 </phrase_list>
 </dialog>
@@ -11410,6 +11428,7 @@
 
 
 <dialog id="tema_talk_one">
+<has_info>starshoy_say_one_start</has_info>
 <dont_has_info>tema_talk_one_start</dont_has_info>
 <phrase_list>
 <phrase id="0">

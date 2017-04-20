@@ -47,109 +47,66 @@ end
 
 function on_first_update( obj )
   if not obj:alive() then
-    -- спавн друпа если не был произведен
+    -- чистка лута у трупика из all.spawn, если еще не делалось.
     drop_manager( obj:id() ):create_release_item()
   end
 end
 
 
 function on_death( obj, who )
+  -- чистка и генерация нового лута
   drop_manager( obj:id(), who:id() ):create_release_item()
 end
 
 
 local total_debug = false
-function write_log( str )
+function write_log( str, ... )
   if total_debug then
-    log1( str )
+    log2( str, ... )
   end
 end
 
 
 local ammo_deferred_release = {}
---' Ключем является группировка персонажа. Значением является таблица, содержашая имена секций предметов.
+
+-- Ключем является группировка персонажа. Значением является таблица,
+-- содержашая имена секций предметов.
 local item_by_community = {}
 
---' Зависимости в спауне предметов. Предмет спауниться только если есть хотя бы один из зависимых.
-local item_dependence = {}
-
 --' Множители и минимаксы для выпадения вещей в зависимости от уровня
-local mul_by_level = {}
 local count_by_level = {}
 
 --' Предметы, которые нельзя удалять (квестовые например)
 local always_keep_item = {}
 
 local always_offs_items = {
-        ["device_torch"]=true,
-        ["device_pda"]=true,
-        ["hand_radio"]=true,
-        ["binocular_a"]=true,
-        ["wpn_knife"]=true,
-        ["wpn_binoc"]=true,
-        ["bolt"]=true,
-        ["grenade_f1"]=true,
-        ["grenade_rgd5"]=true,
-        ["ammo_9x19_pbp"]=true,
-        ["ammo_9x39_pab9"]=true,
-        ["ammo_9x39_ap"]=true,
-        ["ammo_9x18_fmj"]=true,
-        ["ammo_9x18_pmm"]=true,
-        ["ammo_11.43x23_fmj"]=true,
-        ["ammo_5.45x39_fmj"]=true,
-        ["ammo_5.45x39_ap"]=true,
-        ["ammo_9x19_fmj"]=true,
-        ["ammo_5.56x45_ss190"]=true,
-        ["ammo_5.56x45_ap"]=true,
-        ["ammo_12x70_buck"]=true,
-        ["ammo_12x76_zhekan"]=true,
-        ["ammo_12x76_dart"]=true,
-        ["ammo_7.62x39_fmj"]=true,
-        ["ammo_7.62x39_ap"]=true,
-        ["ammo_12.7x108"]=true,
-        ["ammo_og-7b"]=true,
-        ["ammo_m209"]=true,
-        ["ammo_vog-25p"]=true,
-        ["ammo_igl_new"]=true,
-        ["bandage"]=true,
-        ["medkit"]=true,
-        ["medkit_army"]=true,
-        ["medkit_scientic"]=true,
-        ["antirad"]=true,
-        ["bread"]=true,
-        ["kolbasa"]=true,
-        ["conserva"]=true,
-        ["vodka"]=true,
-        ["sigaret"]=true,
-        ["player"]=true,
-        ["energy_drink"]=true,
-        ["gl_test_shell"] = true,
-        ["gl_test_shell_ammo_vog-25"] = true,
-        ["gl_test_shell_ammo_vog-25p"] = true,
-        ["gl_test_shell_ammo_m209"] = true,
-        ["gl_test_shell_ammo_m208a"] = true,
-        ["gl_fake_missile"] = true,
-        ["gl_fake_missile_ammo_vog-25"] = true,
-        ["gl_fake_missile_ammo_vog-25p"] = true,
-        ["gl_fake_missile_ammo_m209"] = true,
-        ["gl_fake_missile_ammo_m208a"] = true,
-        ["fake_grenades_base"] = true,
-        ["grenade_f1_fake"] = true,
-        ["grenade_rgd5_fake"] = true,
-        ["grenade_gd-05_fake"] = true,
-        ["grenade_flash_fake"] = true,
-        ["grenade_f1_test"] = true,
-        ["grenade_rgd5_test"] = true,
-        ["grenade_gd-05_test"] = true,
-        ["grenade_flash_test"] = true,
+  [ "bolt"          ] = true,
+  [ "device_pda"    ] = true,
+  [ "device_torch"  ] = true,
+  [ "hand_radio"    ] = true,
+  [ "fake_grenades_base" ] = true,
+  [ "gl_fake_missile" ] = true,
+  [ "gl_fake_missile_ammo_m208a"  ] = true,
+  [ "gl_fake_missile_ammo_m209"   ] = true,
+  [ "gl_fake_missile_ammo_vog-25" ] = true,
+  [ "gl_fake_missile_ammo_vog-25p"] = true,
+  [ "gl_test_shell" ] = true,
+  [ "gl_test_shell_ammo_m208a"   ] = true,
+  [ "gl_test_shell_ammo_m209"    ] = true,
+  [ "gl_test_shell_ammo_vog-25"  ] = true,
+  [ "gl_test_shell_ammo_vog-25p" ] = true,
+  [ "grenade_f1_fake"    ] = true,
+  [ "grenade_f1_test"    ] = true,
+  [ "grenade_flash_fake" ] = true,
+  [ "grenade_flash_test" ] = true,
+  [ "grenade_gd-05_fake" ] = true,
+  [ "grenade_gd-05_test" ] = true,
+  [ "grenade_rgd5_fake"  ] = true,
+  [ "grenade_rgd5_test"  ] = true,
 }
 
 -- эти вещи остаются с указанной вероятностью
-local always_offs_items_prob = {
-        ["guitar_a"]=0.01,
-        ["balalaika_a"]=0.01,
-        ["harmonica_a"]=0.01,
-}
+local always_offs_items_prob = {}
 
 -- Таблица выдачи инфопорций по части имени погибшего непися.
 local names_info = {
@@ -351,167 +308,151 @@ local sect_by_visual_part = {
         }
 }
 
--- вероятность выпадения бронежилетов и диапазон состояний выпавших бронежилетов и оружия
+-- вероятность выпадения бронежилетов и диапазон состояний выпавших
+-- бронежилетов и оружия
 -- condition - диапазон состояний выпавших бронежилетов и оружия
 -- probability_outfit - вероятность выпадения бронежилетов
 local data_by_community = {
-        default = { -- значения по-умолчанию для неизвестной группировки
-                condition = {min = 5, max = 95},
-                probability_outfit = 15
-        },
-        communities = {
-                ["military"]    = {
-                        condition                       = {min = 35, max = 75},
-                        probability_outfit      = 20
-                },
-                ["killer"]              = {
-                        condition                       = {min = 45, max = 75},
-                        probability_outfit      = 15 --20
-                },
-                ["monolith"]    = {
-                        condition                       = {min =  5, max = 45},
-                        probability_outfit      = 15
-                },
-                ["zombied"]             = {
-                        condition                       = {min =  15, max = 35},
-                        probability_outfit      = 15
-                },
-                ["bandit"]              = {
-                        condition                       = {min = 25, max = 55},
-                        probability_outfit      = 15 --20
-                },
-                ["stalker"]             = {
-                        condition                       = {min = 25, max = 70},
-                        probability_outfit      = 20
-                },
-                ["dolg"]                = {
-                        condition                       = {min = 35, max = 70},
-                        probability_outfit      = 20
-                },
-                ["freedom"]             = {
-                        condition                       = {min = 35, max = 70},
-                        probability_outfit      = 20
-                },
-                ["ecolog"]              = {
-                        condition                       = {min = 35, max = 70},
-                        probability_outfit      = 20
-                },
-                ["sniper"]              = {
-                        condition                       = {min = 55, max = 85},
-                        probability_outfit      = 15
-                },
-                ["green"]               = {
-                        condition                       = {min = 35, max = 70},
-                        probability_outfit      = 15
-                },
-                ["nebo"]                = {
-                        condition                       = {min = 25, max = 65},
-                        probability_outfit      = 20
-                },
-                ["lastday"]             = {
-                        condition                       = {min = 25, max = 60},
-                        probability_outfit      = 10
-                }
-        }
+  default = {     -- значения по-умолчанию для неизвестной группировки
+    condition          = { min = 5, max = 95 },
+    probability_outfit = 15,
+  },
+  communities = {
+    [ "military" ] = {
+      condition          = { min = 35, max = 75 },
+      probability_outfit = 20,
+    },
+    [ "killer"   ] = {
+      condition          = { min = 45, max = 75 },
+      probability_outfit = 15,
+    },
+    [ "monolith" ] = {
+      condition          = { min =  5, max = 45 },
+      probability_outfit = 15,
+    },
+    [ "zombied"  ] = {
+      condition          = { min = 15, max = 35 },
+      probability_outfit = 15,
+    },
+    [ "bandit"   ] = {
+      condition          = { min = 25, max = 55 },
+      probability_outfit = 15,
+    },
+    [ "stalker"  ] = {
+      condition          = { min = 25, max = 70 },
+      probability_outfit = 20,
+    },
+    [ "dolg"     ] = {
+      condition          = { min = 35, max = 70 },
+      probability_outfit = 20,
+    },
+    [ "freedom"  ] = {
+      condition          = { min = 35, max = 70 },
+      probability_outfit = 20,
+    },
+    [ "ecolog"   ] = {
+      condition          = { min = 35, max = 70 },
+      probability_outfit = 20,
+    },
+    [ "sniper"   ] = {
+      condition          = { min = 55, max = 85 },
+      probability_outfit = 15,
+    },
+    [ "green"    ] = {
+      condition          = { min = 35, max = 70 },
+      probability_outfit = 15,
+    },
+    [ "nebo"     ] = {
+      condition          = { min = 25, max = 65 },
+      probability_outfit = 20,
+    },
+    [ "lastday"  ] = {
+      condition          = { min = 25, max = 60 },
+      probability_outfit = 10,
+    },
+  }
 }
 
---' Предметы, относящиеся к патронам. Их надо спаунить другим методом.
+-- Предметы, относящиеся к патронам. Их надо спаунить другим методом.
 local ammo_sections = {}
+
+function get_ammo_sections()
+  return ammo_sections
+end
+
+local death_items = {}
+function get_death_items()
+  return death_items
+end
 
 
 function init_drop_settings()
-    --local community_list = { "stalker", "dolg", "freedom", "bandit", "military", "zombied", "ecolog", "killer", "monolith", "arena_enemy", "actor_dolg", "sniper", "green", "nebo", "vermaht" }
+  --' Предметы, относящиеся к патронам. Их надо спаунить другим методом.
+  for i = 0, sys_ini:line_count( "death_generic.ammo_sections" ) - 1 do
+    local result, id, value = sys_ini:r_line(
+      "death_generic.ammo_sections", i, "", ""
+    )
+    ammo_sections[ id ] = true
+  end
 
-        local n
-        local id, value
-    for k,v in pairs(data_by_community.communities) do
-        --' Необходимо заполнить таблицу
-        item_by_community[k] = {}
-        if sys_ini:section_exist( "death_generic." .. k ) then
-                        n = sys_ini:line_count( "death_generic." .. k )
-                        id, value = "", ""
-                    for i=0,n-1 do
-                                result, id, value = sys_ini:r_line( "death_generic." .. k, i,"","")
-                --item_by_community[v][id] = 1000 * tonumber(value)
-                           --if tonumber(value) >= 0.4 then value = 0.2 end             -- Вот так делать ни в коем случае нельзя. Нужно править конфиг, а не обрезать всё тупым ножом. А как быть с предметами, которые должны выпадать больше чем в 40% трупов? Proper70
-                                item_by_community[k][id] = 1000 * tonumber(value)
-                    end
+  local lsect        = "death_generic." .. level.name()
+  local mul_by_level = {}
+  if not sys_ini:section_exist( lsect ) then
+    lsect = "death_generic.default"
+  end
+  for i = 0, sys_ini:line_count( lsect ) - 1 do
+    local result, id, value = sys_ini:r_line( lsect, i, "", "" )
+    mul_by_level[ id ] = tonumber( value )
+  end
+
+  for k, v in pairs( data_by_community.communities ) do
+    -- Необходимо заполнить таблицу
+    local sect = "death_generic." .. k
+    if sys_ini:section_exist( sect ) then
+      item_by_community[ k ] = {}
+      for i = 0, sys_ini:line_count( sect ) - 1 do
+        local result, id, value = sys_ini:r_line( sect, i, "", "" )
+        local rnd = tonumber( value )
+        if mul_by_level[ id ] then
+          rnd = rnd * mul_by_level[ id ]
         end
+        if rnd > 0 then
+          item_by_community[ k ][ id ] = rnd
+          death_items[ id ] = true
+        end
+      end
     end
+  end
+  ASSERT(
+    item_by_community.stalker,
+    "[%s]: death_generic.stalker is mandatory section"
+  )
 
-    --' Заполняем таблицу зависимостей
-        local n = sys_ini:line_count( "death_generic.item_dependence" )
-        local id, value = "", ""
-        local vvv
-        for i=0,n-1 do
-                result, id, value        = sys_ini:r_line( "death_generic.item_dependence", i,"","")
-                item_dependence[id] = {}
-                        vvv = parse_names(value)
-                for k,v in pairs(vvv) do
-                        item_dependence[id][v] = true
-                end
-        end
+  -- Множители и минимаксы для выпадения вещей в зависимости от уровня
+  local item_count_section = "death_generic.item_count_"
+    .. level.get_game_difficulty()
+  for i = 0, sys_ini:line_count( item_count_section ) - 1 do
+    local result, id, value = sys_ini:r_line( item_count_section, i, "", "" )
+    -- Нужно распарсить value в два значения
+    local t = parse_nums( value )
+    ASSERT(
+      t[1],
+      "Error on [death_ini] declaration. Section [%s], line [%s]",
+      item_count_section, tostring(id)
+    )
+    local count_min = t[ 1 ]
+    local count_max = t[ 2 ]
+    if not count_max then count_max = count_min end
+    count_by_level[ id ] = { min = count_min, max = count_max }
+  end
 
-        --' Множители и минимаксы для выпадения вещей в зависимости от уровня
-    local level_name = level.name()
-
-        if not sys_ini:section_exist( "death_generic." .. level_name ) then
-                level_name = "default"
-        end
-
-    n = sys_ini:line_count( "death_generic." .. level_name )
-    id, value = "", ""
-        for i=0,n-1 do
-                result, id, value        = sys_ini:r_line( "death_generic." .. level_name, i,"","")
-        mul_by_level[id] = tonumber(value)
-        end
-
-    local item_count_section = "item_count_" .. level.get_game_difficulty()
-    local n = sys_ini:line_count( "death_generic." .. item_count_section )
-        local t
-        local count_min, count_max
-        for i=0,n-1 do
-                result, id, value        = sys_ini:r_line( "death_generic." .. item_count_section, i,"","")
-        --' Нужно распарсить value в два значения
-        t = parse_nums(value)
-                if t[1] == nil then
-            abort("Error on [death_ini] declaration. Section [%s], line [%s]", item_count_section, tostring(id))
-        end
-        count_min = t[1]
-        count_max = t[2]
-        if count_max == nil then
-            count_max = count_min
-        end
-
-        if mul_by_level[id] == nil then
-            mul_by_level[id] = 0
-        end
-
-                --get_console():execute("load ~~~ mul_by_level["..id.."] = "..mul_by_level[id].." count_min: "..count_min.." count_max: "..count_max)
-
-        count_min = tonumber(count_min) * mul_by_level[id]
-        count_max = tonumber(count_max) * mul_by_level[id]
-
-        count_by_level[id] = {min = count_min, max = count_max}
-        end
-
-         --' Предметы, которые нельзя удалять (квестовые например)
-    local n = sys_ini:line_count( "death_generic.keep_items" )
-        for i=0,n-1 do
-                result, id, value        = sys_ini:r_line( "death_generic.keep_items", i,"","")
-        if value == "true" then
-            always_keep_item[id] = true
-        end
-    end
-
-        --' Предметы, относящиеся к патронам. Их надо спаунить другим методом.
-    ammo_sections = {}
-    local n = sys_ini:line_count( "death_generic.ammo_sections" )
-        id, value = "", ""
-        for i=0,n-1 do
-                result, id, value        = sys_ini:r_line( "death_generic.ammo_sections", i,"","")
-        ammo_sections[id] = true
-        end
+  -- Предметы, которые нельзя удалять (квестовые например)
+  for i = 0, sys_ini:line_count( "death_generic.keep_items" ) - 1 do
+    local result, id, value = sys_ini:r_line(
+      "death_generic.keep_items", i, "", ""
+    )
+    always_keep_item[ id ] = true
+  end
 end
 
 
@@ -553,6 +494,36 @@ function drop_manager:set_weapon_drop_condition( item )
 end
 
 
+local cached_wpn_info = {}
+function get_ammo_for_weapon( wpn )
+  local sect = wpn:section()
+  if not cached_wpn_info[ sect ] then
+    local t = {}
+    cached_wpn_info[ sect ] = t
+    local ammo_class = get_string( sect, "ammo_class"    )
+    if ammo_class then
+      t.ammo = {}
+      for _, k in ipairs( parse_names( ammo_class ) ) do
+        t.ammo[ k ] = true
+      end
+    end
+    local grenade_class = get_string( sect, "grenade_class" )
+    if grenade_class then
+      t.grenade = {}
+      for _, k in ipairs( parse_names( grenade_class ) ) do
+        t.grenade[ k ] = true
+      end
+    end
+  end
+  return cached_wpn_info[ sect ]
+end
+
+
+function get_spawn_items( comm )
+  return item_by_community[ comm ] or item_by_community.stalker
+end
+
+
 function drop_manager:create_release_item()
   if not self.npc then return end
   --' Спрашиваем у серверного объекта генерились ли предметы
@@ -569,43 +540,76 @@ function drop_manager:create_release_item()
   local cond     = data.condition
   local cond_add = 5 * ( 3 - level.get_game_difficulty() )
 
-  -- if xr_companion.is_companion( self.npc:id() ) then
-  --   self.npc:iterate_inventory( companion_item, self.npc )
-  --   return
-  -- end
-
   --' Запускаем итератор на удаление предметов
+  local can_have_ammo = {}
+  local items         = {}
   self.npc:iterate_inventory(
     function( npc, item )
-      self:keep_item( item )
+      if item:is_weapon() then
+        local t = get_ammo_for_weapon( item )
+        if t.ammo then
+          for k, _ in pairs( t.ammo ) do
+            can_have_ammo[ k ] = true
+          end
+        end
+        if
+          t.grenade
+          and item:is_weapon_gl()
+          and (
+            ogse_wpn_utils.get_grenade_launcher_status( item ) == 1
+            or (
+              ogse_wpn_utils.get_grenade_launcher_status( item ) == 2
+              and ogse_wpn_utils.get_grenade_launcher_flag( item )
+            )
+          )
+        then
+          for k, _ in pairs( t.grenade ) do
+            can_have_ammo[ k ] = true
+          end
+        end
+      end
+      local t = {
+        [ "item" ] = item,
+      }
+      table.insert( items, t )
     end,
     self.npc
   )
-
-  --' чистим стволы и задаем им состояние
-  self:npc_clear_spawn( cond.min, cond.max, cond_add )
+  for _, t in ipairs( items ) do
+    if not self:keep_item( t.item ) then
+      t.item = nil
+    end
+  end
+  -- чистим стволы и задаем им состояние
+  self:npc_clear_spawn( items, cond.min, cond.max, cond_add )
 
   --' Проверка на отсутствие спауна лута
   local ini = self.npc:spawn_ini()
-  if ini and ini:section_exist( "dont_spawn_loot" ) then
+  if
+    ( ini and ini:section_exist( "dont_spawn_loot" ) )
+    or not self.who
+  then
     return
   end
 
   --' Доспавниваем необходимое количество итемов:
-  --' Необходимо составить список объектов которые могут быть заспавнены для персонажа
-  local spawn_items = item_by_community[ self.npc:character_community() ]
+  --' Необходимо составить список объектов которые могут быть
+  --заспавнены для персонажа
+  local spawn_items = get_spawn_items( self.npc:character_community() )
   local who         = self:get_recipient()
   if spawn_items and who then
   		news_manager.send_tip(db.actor, "Получены вещи "..self.npc:character_community(), nil, nil, 10000)
     for k, v in pairs( spawn_items ) do
       --' По каждому объекту необходимо получить зависимости
-      if check_item_dependence( self.npc, k ) == true then
-        --' По каждому объекту необходимо получить количество
-        local number = math.ceil(
-          math.random( count_by_level[ k ].min, count_by_level[ k ].max )
-        )
-        --' Необходимо заспавнить нужное количество.
-        create_items( who, k, number, v )
+      if can_have_ammo[ k ] or not ammo_sections[ k ] then
+        -- По каждому объекту необходимо получить количество
+        if count_by_level[ k ] then
+          local number = math.random(
+            count_by_level[ k ].min, count_by_level[ k ].max
+          )
+          -- Необходимо заспавнить нужное количество.
+          create_items( who, k, number, v )
+        end
       end
     end
   end
@@ -718,18 +722,21 @@ end
 -- предмет удалится.  Разве ? Удаление происходит прямо внутри
 -- функции, а внешнему итератору наплевать на результат (sapsan)
 function drop_manager:keep_item( item )
-  if not self.npc or not item or not alife():object( item:id() ) then return end
+  if not ( self.npc and item ) then return false end
+  local sobj = alife():object( item:id() )
+  if not sobj then return false end
   local section = item:section()
-  if always_offs_items[ section ] or ammo_sections[ section ] then
-    alife():release( alife():object( item:id() ), true )
-    return false
-  elseif
-    always_offs_items_prob[ section ]
-    and math.random() > always_offs_items_prob[ section ]
+  if
+    always_offs_items[ section ]
+    or (
+      always_offs_items_prob[ section ]
+      and math.random() < always_offs_items_prob[ section ]
+    )
   then
-    alife():release( alife():object( item:id() ), true )
+    alife():release( sobj )
     return false
   end
+  return true
 end
 
 
@@ -815,8 +822,8 @@ function create_items( npc, section, number, rnd )
     if npc:get_inventory_weight() > max_weight then return end
     if get_float( section, "inv_weight" ) > max_weight then return end
   end
-  if ammo_sections[ section ] == true then
-    if number > 0 then
+  if ammo_sections[ section ] then
+    if number > 0 and math.random() <= rnd then
       se_respawn.create_ammo(
         section,
         npc:position(), npc:level_vertex_id(), npc:game_vertex_id(),
@@ -827,8 +834,19 @@ function create_items( npc, section, number, rnd )
   else
     for i = 1, number do
       --' Проверяем вероятность появить каждый объект в отдельности
-      if math.random( 1000 ) <= rnd then
-        return alife():create(
+      local r = math.random()
+      if r <= rnd then
+        if dsh.is_artefact( section ) then
+          local prop = amk_utils.get_item_props( section )
+          if prop.has_af_dyn then
+            section = amk_anoms.make_dyn_art_sect( section )
+            prop    = amk_utils.get_item_props( section )
+          end
+          if math.random() < 0.1 then
+            if prop.af_bio_sect then section = prop.af_bio_sect end
+          end
+        end
+        alife():create(
           section,
           npc:position(), npc:level_vertex_id(), npc:game_vertex_id(),
           npc:id()
@@ -839,83 +857,63 @@ function create_items( npc, section, number, rnd )
 end
 
 
---' Функция проверяет есть ли хоть один из зависимых объектов у персонажа
-function check_item_dependence(npc, section)
-        if npc == nil then return end
-        if item_dependence[section] == nil then
-                return true
-        end
-
-    local d_flag = true
-    for k,v in pairs(item_dependence[section]) do
-        local obj = npc:object(k)
-        if obj and npc:marked_dropped(obj) ~= true then
-            return true
-        end
-        d_flag = false
-    end
-
-    return d_flag
-end
-
 -- чистка оружия и других предметов, которые спавнятся через секцию
 -- spawn в конфиге непися
-function drop_manager:npc_clear_spawn( cond_min, cond_max, cond_add )
-  local npc = self.npc
-  local who = self:get_recipient()
-  local items = {}
-  local active_item = npc:active_item()
-  for i = 0, npc:object_count() - 1 do
-    local item = npc:object( i )
-    if alife():object( item:id() ) then
-      table.insert( items, item )
-    end
-  end
+function drop_manager:npc_clear_spawn( items, cond_min, cond_max, cond_add )
+  local npc            = self.npc
+  local who            = self:get_recipient()
+  local active_item    = npc:active_item()
   local ammos          = {}
   local release_items  = {}
+  local death_items    = get_death_items()
   local transfer_items = {}
-  for _, item in ipairs( items ) do
-    local section = item:section()
-    if item:is_weapon() and not is_unique_wpn( section ) then
-      if who then
-        item:unload_magazine()
-        local rnd_cond = ( math.random( cond_min, cond_max ) + cond_add ) / 100
-        if item:condition() > rnd_cond then
-          item:set_condition( rnd_cond )
-        end
-        if who:id() ~= npc:id() then
-          if active_item and item:id() == active_item:id() then
-            npc:move_to_ruck( item )
-          end
-          table.insert( transfer_items, item )
-        end
-      else
+  for _, t in ipairs( items ) do
+    if t.item then
+      local item    = t.item
+      local section = item:section()
+      if death_items[ section ] then
         table.insert( release_items, item )
-      end
-    elseif ammo_sections[ section ] then
-      -- чистим патроны
-      if count_by_level[ section ] then
-        local number = math.ceil(
-          math.random(
-            count_by_level[ section ].min, count_by_level[ section ].max
-          )
-        )
-        if number > 0 then
-          table.insert( ammos, { sect = section, cnt = number } )
-        end
-      end
-      table.insert( release_items, item )
-    else
-      if
-        ( not watcher_act.do_not_touch( item ) )
-        and ( not is_unique_wpn( section ) )
-      then
+      elseif item:is_weapon() and not is_unique_wpn( section ) then
         if who then
+          item:unload_magazine()
+          local rnd_cond = (
+            math.random( cond_min, cond_max ) + cond_add
+          ) / 100
+          if item:condition() > rnd_cond then
+            item:set_condition( rnd_cond )
+          end
           if who:id() ~= npc:id() then
+            if active_item and item:id() == active_item:id() then
+              npc:move_to_ruck( item )
+            end
             table.insert( transfer_items, item )
           end
         else
           table.insert( release_items, item )
+        end
+      elseif ammo_sections[ section ] then
+        -- чистим патроны
+        if count_by_level[ section ] then
+          local number = math.random(
+            count_by_level[ section ].min, count_by_level[ section ].max
+          )
+          if number > 0 then
+            table.insert( ammos, { sect = section, cnt = number } )
+          end
+        end
+        table.insert( release_items, item )
+      else
+        if
+          ( not watcher_act.do_not_touch( item ) )
+          and ( not is_unique_wpn( section ) )
+        then
+          if who then
+            if who:id() ~= npc:id() then
+              table.insert( transfer_items, item )
+            end
+          else
+            table.insert( release_items, item )
+          end
         end
       end
     end
@@ -934,8 +932,8 @@ function drop_manager:npc_clear_spawn( cond_min, cond_max, cond_add )
   end
   -- доспавниваем взамен удаленных патронов
   if who then
-    for k,v in pairs( ammos ) do
-      create_items( who, v.sect, v.cnt, 1000 )
+    for k, v in pairs( ammos ) do
+      create_items( who, v.sect, v.cnt, 1 )
     end
   end
 end
